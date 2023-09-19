@@ -1,14 +1,6 @@
-public class server
-{
-  public static void main (String[] args)
-  {
-
-
-
-
+public class server {
+  public static void main(String[] args) {
 
   }
 
-
-
-{
+}

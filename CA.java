@@ -1,12 +1,6 @@
-public class CA
-{
-  public static void (String [] args)
-  {
-
-
+public class CA {
+  public static void main(String[] args) {
 
   }
-
-
 
 }

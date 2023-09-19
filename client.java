@@ -3,11 +3,16 @@ import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.cert.X509Certificate;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
 
 public class client {
 
   private PublicKey publicKey;
   private PrivateKey privateKey;
+  private SecretKey sessionKey;
+  private X509Certificate certificate = null;
 
   public static void main(String[] args) {
 
@@ -20,10 +25,17 @@ public class client {
     // Returns True is connection suceeded, false otherwise
 
     genClientKeys();
-    getCertificate();
+    certificate = CA.signUp();
+    if (certificate == null) {
+
+    }
     exchangeCertificate();
-    genSessionKey();
-    genSessionKey();
+
+    try {
+      sessionKey = genSessionKey();
+    } catch (NoSuchAlgorithmException e) {
+      e.printStackTrace();
+    }
 
     return false;
   }
@@ -48,13 +60,23 @@ public class client {
 
   }
 
-  private void getCertificate() {// call the sign up method from the CA class and recieve a certificate
-  }
-
   private void exchangeCertificate() {
   }
 
-  private void genSessionKey() {
+  private SecretKey genSessionKey() throws NoSuchAlgorithmException {
+    try {
+      // Create a KeyGenerator for AES
+      KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+      int keySize = 128;
+      keyGen.init(keySize);
+      // Generate the AES session key
+      SecretKey sessionKey = keyGen.generateKey();
+
+      // Return the generated session key
+      return sessionKey;
+    } catch (NoSuchAlgorithmException e) {
+      throw e;
+    }
   }
 
 }

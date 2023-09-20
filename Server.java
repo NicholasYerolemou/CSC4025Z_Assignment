@@ -14,6 +14,11 @@ public class Server {
   public static Map<String, ClientRecord> clientRecords = new HashMap<>(); // HashMap to store client records by name
 
   public static void main(String[] args) {
+    initializeServer();
+  }
+
+  private static void initializeServer() {
+    // initializes server and waits for clients to connect
     try {
       ServerSocket serverSocket = new ServerSocket(PORT);
       System.out.println("Server is listening on port " + PORT);
@@ -30,11 +35,13 @@ public class Server {
     } catch (IOException e) {
       e.printStackTrace();
     }
+
   }
 
   // Define a separate class for handling client connections
   static class ClientHandler implements Runnable {
-    private Socket clientSocket;
+    private static Socket clientSocket;
+    private ClientRecord thisClient;
 
     public ClientHandler(Socket socket) {
       this.clientSocket = socket;
@@ -47,27 +54,9 @@ public class Server {
         BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
         PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true);
 
-        // System.out.println("Length of hasmap " + clientRecords.size());
-
-        // Create a new client record
+        // Create a new client record or load exisitng one
         String clientDetails = reader.readLine();
-        String[] clientDetailsArr = clientDetails.split(",");
-        String name = clientDetailsArr[0];
-        String clientIP = clientSocket.getInetAddress().getHostAddress();
-        ClientRecord thisClient;
-
-        synchronized (clientRecords) {
-          if (clientRecords.containsKey(name))// this client has connected before
-          {
-            thisClient = clientRecords.get(name);
-            thisClient.connected();
-            System.out.println("Loaded existing client record");
-          } else {// new client
-            thisClient = new ClientRecord(clientIP, name);
-            clientRecords.put(name, thisClient);
-            System.out.println("Created new client record for: " + name);
-          }
-        }
+        thisClient = processClient(clientDetails);
 
         String clientMessage;
         while ((clientMessage = reader.readLine()) != null) {
@@ -78,7 +67,7 @@ public class Server {
           }
 
           // Handle client requests and send responses
-          System.out.println("Received from client: " + clientMessage);
+          System.out.println("Received from " + thisClient.getName() + ": " + clientMessage);
           writer.println("Thank you for your message, " + clientMessage + ", - Server");
           thisClient.addMessage(clientMessage);
         }
@@ -91,6 +80,33 @@ public class Server {
         e.printStackTrace();
       }
     }
+
+    private static ClientRecord processClient(String clientDetails) {
+      // loads clients detials if they have connected before, otherwise creates new
+      // ClientRecord
+      // Clients are identified by their name
+      String[] clientDetailsArr = clientDetails.split(",");
+      String name = clientDetailsArr[0];
+      String clientIP = clientSocket.getInetAddress().getHostAddress();
+      ClientRecord thisClient;
+
+      synchronized (clientRecords) {
+        if (clientRecords.containsKey(name))// this client has connected before
+        {
+          thisClient = clientRecords.get(name);
+          thisClient.connected();
+          System.out.println("Loaded existing client record");
+
+        } else {// new client
+          thisClient = new ClientRecord(clientIP, name);
+          clientRecords.put(name, thisClient);
+          System.out.println("Created new client record for: " + name);
+        }
+
+      }
+      return thisClient;
+    }
+
   }
 
   private static class ClientRecord {
@@ -114,6 +130,10 @@ public class Server {
 
     public void connected() {
       isConnected = true;
+    }
+
+    public String getName() {
+      return name;
     }
 
     public boolean isConnected() {

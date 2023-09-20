@@ -22,6 +22,8 @@ public class Client {
   }
 
   private static boolean connectToServer() {
+    // creates a connection to the server, output stream to that connection and
+    // sends initial client info to the server
     try {
       socket = new Socket(SERVER_HOST, SERVER_PORT);
 

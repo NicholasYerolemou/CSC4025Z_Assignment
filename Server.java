@@ -45,9 +45,14 @@ public class Server {
 
         String clientMessage;
         while ((clientMessage = reader.readLine()) != null) {
+          if (clientMessage.equalsIgnoreCase("exit")) {// The user is closing the connection
+            writer.println("Ending connection with server");
+            clientSocket.close();
+          }
+
           // Handle client requests and send responses
           System.out.println("Received from client: " + clientMessage);
-          writer.println("OK");
+          writer.println("Thank you for your message, " + clientMessage + ", - Server");// send this back to the client
         }
 
         // Close the client socket when done

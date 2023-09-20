@@ -1,5 +1,4 @@
 import java.io.*;
-import java.net.ServerSocket;
 import java.net.Socket;
 
 public class Client {
@@ -37,6 +36,9 @@ public class Client {
       // waits for input from the user, sends it to the server
       BufferedReader userInput = new BufferedReader(new InputStreamReader(System.in));
       OutputStream output = socket.getOutputStream();
+      // send client details to the server
+      System.out.println("Sent client details");
+      sendMessage("Nick", output);
       String userInputLine;
       while (!serverDisconnected) {// ends it the server disconnects
         if (userInput.ready()) {

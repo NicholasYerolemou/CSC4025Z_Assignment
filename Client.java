@@ -1,25 +1,44 @@
 import java.io.BufferedReader;
+import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
+import java.security.PrivateKey;
 import java.util.Base64;
 import java.util.Scanner;
 
+// import org.bouncycastle.jce.provider.BouncyCastleProvider;
+
+
+
+
 public class Client {
     
+
+private PublicKey publicKey;
+private PrivateKey privateKey;
 private static boolean connected = false;
 private Socket targetSocket = null;//the socket if the client you are connected to 
+private String username;
 public Client(String name)
 {
+    username = name;
     if(name.equalsIgnoreCase("Alice"))
-    {
+    {   
         generateKeys();
         getCertificate();
         connectAsServer(); 
@@ -41,55 +60,87 @@ public Client(String name)
 private void generateKeys()
 {
     //generate this clients pub and private keys
+    KeyPairGenerator keyPairGenerator;
+    try {
+        keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+        keyPairGenerator.initialize(2048);
+        KeyPair keyPair = keyPairGenerator.generateKeyPair();
+        publicKey = keyPair.getPublic();
+        privateKey = keyPair.getPrivate();
+    } catch (NoSuchAlgorithmException e) {
+        System.out.println("Unable to create key pair generator.");
+        e.printStackTrace();
+    }
+    
+    
+
 }
 
 private void getCertificate()
 {
     //connect to the CA and request a new certificate
-
-    //connect to the CA 
-    int PORT = 12346;// CA's port number
-    String CA_ADDRESS = "127.0.0.1"; 
-
-    try {
-        
-        Socket CASocket = new Socket(CA_ADDRESS, PORT);
+    Socket CA_Socket = connectToCA();
+    if(CA_Socket!=null)
+    {
         System.out.println("Connected to CA.");
+        //request new certificate
+        //we may need to first establish a secure channel
+        try (PrintWriter outputStream = new PrintWriter(CA_Socket.getOutputStream(), true)) {
+            outputStream.println("0");//0 indicates we want a new certificate
+            //CA sends back their public key
+            InputStream inputStream = CA_Socket.getInputStream();
+            DataInputStream dataInputStream = new DataInputStream(inputStream);
+            int keyLength = dataInputStream.readInt();
+            byte[] receivedPublicKeyBytes = new byte[keyLength];
+            dataInputStream.readFully(receivedPublicKeyBytes);
+            KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(receivedPublicKeyBytes);
+            PublicKey CA_PublicKey = keyFactory.generatePublic(publicKeySpec);
 
-        //create output stream to CA
-            PrintWriter outputStream = null;
-            BufferedReader inputStream = null;
-    
-        
-        try{
+            // String commonName = username;
+
             
-            outputStream = new PrintWriter(CASocket.getOutputStream(), true);
-            String message = "0";//0 means we want to create a certificate
-            //attach further information the CA will need
-            outputStream.println(message);
-            System.out.println("Certificate requested from CA.");
+            
 
-            inputStream = new BufferedReader(new InputStreamReader(CASocket.getInputStream()));
-            String certificateMessage = inputStream.readLine();
-            System.out.println("Certificate recieved "+ certificateMessage+".");
 
+        } catch (IOException | NoSuchAlgorithmException | InvalidKeySpecException e) {
+           
+            e.printStackTrace();
+            //can potentially restart the method here and attempt it again
         }
-        catch (IOException e)
-        {
-            System.out.println("Failed to create writer to client"+e.getMessage());
-        }
-
-
+    }
+    else
+    {
+        System.out.println("Unable to connect to CA.");
         
-        //create output stream to the CA
-        //create input stream from the CA
-        //send a message with the ID of 0 to say we want to create a certificate, attach the information we need to that message
-        //get back our certificate and the CA's public key, the certificate has been encoded by the CA's private key we store it that way, store the public key too.
-    } catch (IOException e) {
-        System.err.println("Error connecting to CA: " + e.getMessage());
     }
 
+    
+
+    
 }
+
+private Socket connectToCA()
+{
+    int CA_PORT = 12346;// CA's port number
+    String CA_ADDRESS = "127.0.0.1";
+    Socket CA_Socket = null;
+    try {
+        CA_Socket = new Socket(CA_ADDRESS, CA_PORT);
+    } catch (IOException e) {
+        System.out.println("Unable to connect to CA. Attempting again in 5 seconds.");
+        //this doesnt work properly yet
+        try {
+            Thread.sleep(5000);
+            connectToCA();
+        } catch (InterruptedException e1) {
+            e1.printStackTrace();
+        }
+    }
+    return CA_Socket;
+
+}
+
 
 
 
@@ -323,6 +374,7 @@ private void recieveMessage(String message)
 
 public static void main (String [] args)
 {
+    // Security.addProvider(new BouncyCastleProvider());
     Client client = new Client(args[0]);
 }
 }

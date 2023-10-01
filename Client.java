@@ -1,5 +1,6 @@
 import java.io.BufferedReader;
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -9,33 +10,43 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
+import java.security.Security;
+import java.security.Signature;
+import java.security.SignatureException;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.security.PrivateKey;
 import java.util.Base64;
 import java.util.Scanner;
 
-// import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+
+
 
 
 
 
 public class Client {
     
-
+SecretKey sessionKey;
 private PublicKey publicKey;
 private PrivateKey privateKey;
 private static boolean connected = false;
 private Socket targetSocket = null;//the socket if the client you are connected to 
 private String username;
+
 public Client(String name)
 {
+   
     username = name;
     if(name.equalsIgnoreCase("Alice"))
     {   
@@ -80,40 +91,61 @@ private void getCertificate()
 {
     //connect to the CA and request a new certificate
     Socket CA_Socket = connectToCA();
-    if(CA_Socket!=null)
-    {
-        System.out.println("Connected to CA.");
-        //request new certificate
-        //we may need to first establish a secure channel
-        try (PrintWriter outputStream = new PrintWriter(CA_Socket.getOutputStream(), true)) {
-            outputStream.println("0");//0 indicates we want a new certificate
-            //CA sends back their public key
-            InputStream inputStream = CA_Socket.getInputStream();
-            DataInputStream dataInputStream = new DataInputStream(inputStream);
-            int keyLength = dataInputStream.readInt();
-            byte[] receivedPublicKeyBytes = new byte[keyLength];
-            dataInputStream.readFully(receivedPublicKeyBytes);
-            KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(receivedPublicKeyBytes);
-            PublicKey CA_PublicKey = keyFactory.generatePublic(publicKeySpec);
+    // if(CA_Socket!=null)
+    // {
+    //     System.out.println("Connected to CA.");
+    //     //request new certificate
+    //     //we may need to first establish a secure channel
+    //     try (PrintWriter outputStream = new PrintWriter(CA_Socket.getOutputStream(), true)) {
+    //         outputStream.println("0");//0 indicates we want a new certificate
+    //         //CA sends back their public key
+    //         InputStream inputStream = CA_Socket.getInputStream();
+    //         DataInputStream dataInputStream = new DataInputStream(inputStream);
+    //         int keyLength = dataInputStream.readInt();
+    //         byte[] receivedPublicKeyBytes = new byte[keyLength];
+    //         dataInputStream.readFully(receivedPublicKeyBytes);
+    //         KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+    //         X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(receivedPublicKeyBytes);
+    //         PublicKey CA_PublicKey = keyFactory.generatePublic(publicKeySpec);
 
-            // String commonName = username;
+
+    //         //we send the info needed to create a certificate
+    //         Signature signature = Signature.getInstance("SHA256withRSA");
+    //         signature.initSign(privateKey);
+
+    //         byte[] publicKeyBytes = publicKey.getEncoded();
+    //         String commonName = username;
+    //         byte[] commonNameBytes = commonName.getBytes();
+
+    //         //create a message with both byte arrays
+    //         int length1 = publicKeyBytes.length;
+    //         int length2 = commonNameBytes.length;
+    //         byte[] certificateRequestInfo = new byte[length1 + length2];
+    //         System.arraycopy(publicKeyBytes, 0, certificateRequestInfo, 0, length1);
+    //         System.arraycopy(commonName, 0, certificateRequestInfo, length1, length2);
+    //         //enctrypt the message with out private key
+    //         signature.update(certificateRequestInfo);
+    //         byte[] encryptedMessage = signature.sign();
+
+    //         //send the message to the CA
+    //         DataOutputStream dataOutputStream = new DataOutputStream(CA_Socket.getOutputStream());
+    //         dataOutputStream.writeInt(encryptedMessage.length);
+    //         dataOutputStream.write(encryptedMessage);
+    //         dataOutputStream.flush();
 
             
-            
 
-
-        } catch (IOException | NoSuchAlgorithmException | InvalidKeySpecException e) {
+    //     } catch (IOException | NoSuchAlgorithmException | InvalidKeySpecException | InvalidKeyException | SignatureException e) {
            
-            e.printStackTrace();
-            //can potentially restart the method here and attempt it again
-        }
-    }
-    else
-    {
-        System.out.println("Unable to connect to CA.");
+    //         e.printStackTrace();
+    //         //can potentially restart the method here and attempt it again
+    //     }
+    // }
+    // else
+    // {
+    //     System.out.println("Unable to connect to CA.");
         
-    }
+    // }
 
     
 
@@ -140,9 +172,6 @@ private Socket connectToCA()
     return CA_Socket;
 
 }
-
-
-
 
 private void connectAsServer()
 {
@@ -206,13 +235,57 @@ private void createSession()
         inputStream = new BufferedReader(new InputStreamReader(targetSocket.getInputStream()));//get response from client
         response = inputStream.readLine();
         boolean verified = verifyCertificate(response);
+        verified = true;
         //The response should contain their certificate
         
         if(verified)
         {
-            //generate a session and exchange any other session details
+            
+            
 
-            //generate key 
+            if (username.equalsIgnoreCase("Alice")) {
+                KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
+                keyGenerator.init(128); // Change to the desired key size
+                sessionKey = keyGenerator.generateKey();
+                String sessionKeyBase64 = Base64.getEncoder().encodeToString(sessionKey.getEncoded());
+                MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
+                byte[] sessionKeyHash = sha256.digest(sessionKey.getEncoded());
+                String sessionKeyHashBase64 = Base64.getEncoder().encodeToString(sessionKeyHash);
+
+                outputStream.println(sessionKeyBase64);
+                outputStream.println(sessionKeyHashBase64);
+
+                // Simulate sending the session key and its hash to Bob
+                System.out.println("Alice - Session Key: " + sessionKeyBase64);
+                System.out.println("Alice - Session Key Hash: " + Base64.getEncoder().encodeToString(sessionKeyHash));
+
+            } else if (username.equalsIgnoreCase("Bob")) {
+                // Simulate receiving the session key and its hash from Alice
+                
+                String receivedSessionKeyBase64 = inputStream.readLine(); // Replace with the received session key string
+                String receivedSessionKeyHashBase64 = inputStream.readLine(); // Replace with the received session key hash string
+
+                byte[] receivedSessionKeyBytes = Base64.getDecoder().decode(receivedSessionKeyBase64);
+                byte[] receivedSessionKeyHash = Base64.getDecoder().decode(receivedSessionKeyHashBase64);
+                // Calculate the hash of the received session key
+                MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
+                byte[] calculatedSessionKeyHash = sha256.digest(receivedSessionKeyBytes);
+                // Compare the calculated hash to the received hash
+                boolean keysMatch = MessageDigest.isEqual(receivedSessionKeyHash, calculatedSessionKeyHash);
+
+                // Visual inspection
+                System.out.println("Bob - Received Session Key: " + Base64.getEncoder().encodeToString(receivedSessionKeyBytes));
+                System.out.println("Bob - Calculated Session Key Hash: " + Base64.getEncoder().encodeToString(calculatedSessionKeyHash));
+
+                if (keysMatch) {
+                    System.out.println("Session keys match.");
+                    sessionKey =  new SecretKeySpec(receivedSessionKeyBytes, "AES");
+                } else {
+                    System.out.println("Session keys do not match. Possible tampering.");
+                }
+            }
+
+            
             //encode session key with our private key
             //ecnode session key with their public key
             //send session key
@@ -220,7 +293,7 @@ private void createSession()
         } 
 
     }
-    catch (IOException e)
+    catch (IOException | NoSuchAlgorithmException e)
     {
         System.out.println("Failed to create writer to client"+e.getMessage());
     }

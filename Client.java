@@ -10,6 +10,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
@@ -29,6 +30,7 @@ import java.util.Scanner;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import javax.security.auth.x500.X500Principal;
 
 public class Client {
 
@@ -85,22 +87,38 @@ public class Client {
             BufferedReader inputStream = null;
 
             try {
+                System.out.println("Requesting certificate.");
+
                 outputStream = new PrintWriter(CA_Socket.getOutputStream(), true);
-                inputStream = new BufferedReader(new InputStreamReader(targetSocket.getInputStream()));
+                inputStream = new BufferedReader(new InputStreamReader(CA_Socket.getInputStream()));
                 // request certificate
-                outputStream.write("0");
+                outputStream.println("0");
 
                 // get CAs public key
-                String CA_publicKeyString = inputStream.readLine();
-                KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-                X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(CA_publicKeyString.getBytes());
-                PublicKey CA_PublicKey = keyFactory.generatePublic(publicKeySpec);
+                String recievedMessage = inputStream.readLine();
+                String[] data = recievedMessage.split(",");
+                String CA_publicKeyString = data[0];
+                String messageHash = data[1];
 
-                // Create a CSR certificate signing request
-                // Sign CSR with your private key
-                // Send to CA who will verify the CSR and they sign your public key and other
-                // relevant information with their private key, creating a digital certificate.
-                // They send the digital certificate back to you
+                if (verifyHash(CA_publicKeyString, messageHash)) {
+
+                    byte[] CA_publicKeyBytes = Base64.getDecoder().decode(CA_publicKeyString);
+                    KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+                    X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(CA_publicKeyBytes);
+                    PublicKey CA_PublicKey = keyFactory.generatePublic(publicKeySpec);
+
+                    // Create a CSR certificate signing request using
+                    // PKCS10CertificationRequestBuilder in bouncy castle
+                    // Sign CSR with your private key
+                    // Send to CA who will verify the CSR and then sign your public key and other
+                    // relevant information with their private key, creating a digital certificate.
+                    // They send the digital certificate back to you
+
+                    System.out.println("Certificate recieved.");
+
+                } else {
+                    System.out.println("The hash recieved did not match the CAs public key.");
+                }
 
             } catch (IOException | NoSuchAlgorithmException | InvalidKeySpecException e) {
 

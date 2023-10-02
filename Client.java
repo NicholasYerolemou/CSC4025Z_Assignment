@@ -240,49 +240,43 @@ private void createSession()
         
         if(verified)
         {
-            
-            
-
             if (username.equalsIgnoreCase("Alice")) {
+
+                //generate session key
                 KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
-                keyGenerator.init(128); // Change to the desired key size
+                keyGenerator.init(128);
                 sessionKey = keyGenerator.generateKey();
-                String sessionKeyBase64 = Base64.getEncoder().encodeToString(sessionKey.getEncoded());
-                MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
-                byte[] sessionKeyHash = sha256.digest(sessionKey.getEncoded());
-                String sessionKeyHashBase64 = Base64.getEncoder().encodeToString(sessionKeyHash);
 
-                outputStream.println(sessionKeyBase64);
-                outputStream.println(sessionKeyHashBase64);
+                //convert to string
+                String sessionKeyString = Base64.getEncoder().encodeToString(sessionKey.getEncoded());
+                String sessionKeyhashString = calculateHash(sessionKeyString);
 
-                // Simulate sending the session key and its hash to Bob
-                System.out.println("Alice - Session Key: " + sessionKeyBase64);
-                System.out.println("Alice - Session Key Hash: " + Base64.getEncoder().encodeToString(sessionKeyHash));
+                //send message
+                String message = sessionKeyString+","+sessionKeyhashString;
+                outputStream.println(message);
+              
 
             } else if (username.equalsIgnoreCase("Bob")) {
                 // Simulate receiving the session key and its hash from Alice
-                
-                String receivedSessionKeyBase64 = inputStream.readLine(); // Replace with the received session key string
-                String receivedSessionKeyHashBase64 = inputStream.readLine(); // Replace with the received session key hash string
 
-                byte[] receivedSessionKeyBytes = Base64.getDecoder().decode(receivedSessionKeyBase64);
-                byte[] receivedSessionKeyHash = Base64.getDecoder().decode(receivedSessionKeyHashBase64);
-                // Calculate the hash of the received session key
-                MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
-                byte[] calculatedSessionKeyHash = sha256.digest(receivedSessionKeyBytes);
-                // Compare the calculated hash to the received hash
-                boolean keysMatch = MessageDigest.isEqual(receivedSessionKeyHash, calculatedSessionKeyHash);
+                String message = inputStream.readLine();
+                String [] data = message.split(",");
+                String sessionKeyString = data[0];
+                String sessionKeyHash = data[1];
 
-                // Visual inspection
-                System.out.println("Bob - Received Session Key: " + Base64.getEncoder().encodeToString(receivedSessionKeyBytes));
-                System.out.println("Bob - Calculated Session Key Hash: " + Base64.getEncoder().encodeToString(calculatedSessionKeyHash));
+                if(verifyHash(sessionKeyString, sessionKeyHash))
+                {
 
-                if (keysMatch) {
-                    System.out.println("Session keys match.");
+                    byte[] receivedSessionKeyBytes = Base64.getDecoder().decode(sessionKeyString);
                     sessionKey =  new SecretKeySpec(receivedSessionKeyBytes, "AES");
-                } else {
-                    System.out.println("Session keys do not match. Possible tampering.");
                 }
+                else
+                {
+                    System.out.println("Session key recieved does not match message hash.");
+                    //resend message requesting session key
+                }
+
+             
             }
 
             
@@ -291,6 +285,8 @@ private void createSession()
             //send session key
             //store session key locally
         } 
+
+        System.out.println("Session created.");
 
     }
     catch (IOException | NoSuchAlgorithmException e)
@@ -310,8 +306,6 @@ private boolean verifyCertificate(String recievedCertificate)
 private void listenForUserInput()
 {
     //Create another thread to listen for user input to trigger sending a message.
-
-    
 
     Thread userListenerThread = new Thread(() -> {
     System.out.println("Listening for user input.");
@@ -442,6 +436,16 @@ private void recieveMessage(String message)
       hexString.append(hex);
     }
     return hexString.toString();
+  }
+
+  private boolean verifyHash(String message, String recievedHash) throws NoSuchAlgorithmException
+  {
+    String messageHash = calculateHash(message);
+    if(messageHash.equals(recievedHash))
+    {
+        return true;
+    }
+    else return false;
   }
 
 

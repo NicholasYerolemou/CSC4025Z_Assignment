@@ -93,18 +93,24 @@ public class CA {
         try {
             outputStream = new PrintWriter(connectedClient.getOutputStream(), true);
             inputStream = new BufferedReader(new InputStreamReader(connectedClient.getInputStream()));
+
+            // send the CA's public key to the client
             String pubKeyString = Base64.getEncoder().encodeToString(publicKey.getEncoded());
             String messageHash = calculateHash(pubKeyString);
             String message = pubKeyString + "," + messageHash;
             outputStream.println(message);
 
+            createCertificate();
+            // CA recieves the CSR from the client
+            // Verify the CSR using bouncy castle methods
+            // create certificate baed on the CSR
+            // return the certificate
+
         } catch (IOException | NoSuchAlgorithmException e) {
-            // TODO Auto-generated catch block
+
             e.printStackTrace();
         }
 
-        // check if the client already has a certificate
-        // otherwise create one and send it to them
     }
 
     private void createCertificate() {

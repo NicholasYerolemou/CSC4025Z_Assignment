@@ -11,6 +11,7 @@ import java.util.Base64;
 
 public class GUI {
 
+    Client client;
     // Declare GUI components
     private JFrame frame;
     private JTextField filePathField;
@@ -18,7 +19,8 @@ public class GUI {
     private JTextArea encodedImageArea;
     private byte[] imageBytes; // To store the image data as bytes
 
-    public GUI() {
+    public GUI(Client client) {
+        this.client = client;
         // Initialize the main frame
         frame = new JFrame("Image Caption Application");
         frame.setSize(500, 500);
@@ -97,6 +99,8 @@ public class GUI {
     private void encodeImage() {
         if (imageBytes != null) {
             String imageString = Base64.getEncoder().encodeToString(imageBytes);
+            client.sendMessage(imageString);
+
             encodedImageArea.setText(imageString);
         } else {
             JOptionPane.showMessageDialog(frame, "Please select an image first!");
@@ -105,12 +109,12 @@ public class GUI {
 
     // Main method to run the GUI application
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                new GUI();
-            }
-        });
+        // SwingUtilities.invokeLater(new Runnable() {
+        //     @Override
+        //     public void run() {
+        //         new GUI();
+        //     }
+        // });
     }
 }
 

@@ -34,6 +34,7 @@ import javax.security.auth.x500.X500Principal;
 
 public class Client {
 
+    static Client client;
     SecretKey sessionKey;
     private PublicKey publicKey;
     private PrivateKey privateKey;
@@ -273,23 +274,25 @@ public class Client {
 
         Thread userListenerThread = new Thread(() -> {
             System.out.println("Listening for user input.");
+            System.out.println(this);
+            GUI gui = new GUI(this);
             // Create output stream
-            PrintWriter out = null;
+            // PrintWriter out = null;
 
-            try {
+            // try {
 
-                out = new PrintWriter(targetSocket.getOutputStream(), true);
-            } catch (IOException e) {
-                System.out.println("Failed to create writer to client" + e.getMessage());
-            }
+            //     out = new PrintWriter(targetSocket.getOutputStream(), true);
+            // } catch (IOException e) {
+            //     System.out.println("Failed to create writer to client" + e.getMessage());
+            // }
 
-            while (connected) {
-                // listen for user input
-                Scanner scanner = new Scanner(System.in);
-                String userInput = scanner.nextLine();
-                sendMessage(userInput, out);
+            // while (connected) {
+            //     // listen for user input
+            //     Scanner scanner = new Scanner(System.in);
+            //     String userInput = scanner.nextLine();
+            //     sendMessage(userInput, out);
 
-            }
+            // }
         });
         userListenerThread.start();
 
@@ -333,7 +336,17 @@ public class Client {
 
     }
 
-    private void sendMessage(String message, PrintWriter outWriter) {
+    public void sendMessage(String message) {
+       PrintWriter outputStream;
+    try {
+        outputStream = new PrintWriter(targetSocket.getOutputStream(), true);
+         System.out.println("Message sent: " + message + ".");
+        outputStream.println(message); // Send a message
+    } catch (IOException e) {
+        // TODO Auto-generated catch block
+        e.printStackTrace();
+    }
+
         // process the outgoing message here
 
         // encode message (message is the image) to a string
@@ -341,8 +354,7 @@ public class Client {
         // create combination of message and hash
         // use session key to encrypt it all
         // send it to the client
-        System.out.println("Message sent: " + message + ".");
-        outWriter.println(message); // Send a message
+       
     }
 
     private void recieveMessage(String message) {
@@ -403,6 +415,6 @@ public class Client {
 
     public static void main(String[] args) {
         // Security.addProvider(new BouncyCastleProvider());
-        Client client = new Client(args[0]);
+        client = new Client(args[0]);
     }
 }

@@ -65,13 +65,13 @@ public class Client {
   SecretKey sessionKey;
   private PublicKey publicKey;
   private PrivateKey privateKey;
+  private GUI gui;
 
   private KeyPair keyPair;
   private static boolean connected = false;
   private Socket targetSocket = null;// the socket if the client you are connected to
   private String username;
   private byte[] iv;
-  private byte[] authTag;
 
   public Client(String name) {
     // Security.addProvider(new BouncyCastleProvider());
@@ -87,8 +87,9 @@ public class Client {
       connectAsClient();
     } else {
       System.out.println("Not a valid username. Enter either Alice or Bob");
+      System.exit(1);
     }
-
+    // gui = new GUI(this);
   }
 
   private void generateKeys() {
@@ -361,7 +362,8 @@ public class Client {
     Thread userListenerThread = new Thread(() -> {
       System.out.println("Listening for user input.");
       System.out.println(this);
-      GUI gui = new GUI(this);
+      gui = new GUI(this);
+
       // Create output stream
       // PrintWriter out = null;
 
@@ -459,14 +461,11 @@ public class Client {
    * @return The encrypted message protocol
    */
   private String encryptMessage(String message) throws Exception {
-    System.out.println("encrypting IV: " + Arrays.toString(iv));
     // Create a Cipher for Encryption
     Cipher cipher = Cipher.getInstance("AES");
     // use session key to encrypt it all
     cipher.init(Cipher.ENCRYPT_MODE, sessionKey);
     byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
-    System.out.println("Encryption message size:" + messageBytes.length);
-    System.out.println("Encryption message modulo:" + messageBytes.length % 16);
     // Encrypt the Message
     byte[] encryptedMessage = cipher.doFinal(messageBytes);
     return Base64.getEncoder().encodeToString(encryptedMessage);
@@ -479,8 +478,6 @@ public class Client {
    * @return The decrypted message protocol
    */
   private String decryptMessage(String message) throws Exception {
-    System.out.println("decrypting IV: " + Arrays.toString(iv) + "\nLenghth:" +
-        iv.length);
     // Create a Cipher for Decryption
     Cipher cipher = Cipher.getInstance("AES");
     cipher.init(Cipher.DECRYPT_MODE, sessionKey);
@@ -488,9 +485,6 @@ public class Client {
     // Assuming you have the encrypted message as a byte array
     byte[] encryptedMessage = Base64.getDecoder().decode(message.getBytes(StandardCharsets.UTF_8)); //
     // Replace with your encrypted message bytes
-    System.out.println("Decrypting message size:" + encryptedMessage.length);
-    System.out.println("Decrypting message modulo:" + encryptedMessage.length %
-        16);
     byte[] decryptedMessageBytes = cipher.doFinal(encryptedMessage);
     //
     // Convert the decrypted byte array to a string
@@ -567,7 +561,6 @@ public class Client {
    */
   private void recieveMessage(String message) {
     try {
-      System.out.println("Received message: " + message);
       String decryptedMessage = decryptMessage(message);
       List<String> messageLines = Arrays.asList(decryptedMessage.split("\n"));
       String receivedHash = messageLines.get(0).split(":")[1].trim();
@@ -575,9 +568,13 @@ public class Client {
 
       if (verifyHash(messageWithoutHash, receivedHash)) {
         Map<String, String> parsedMessage = parseMessage(messageLines);
-        for (Map.Entry<String, String> entry : parsedMessage.entrySet()) {
-          System.out.println(entry.getKey() + ": " + entry.getValue());
+        if (parsedMessage.containsKey("message") && parsedMessage.containsKey("image")) {
+          System.out.println("Message: " + parsedMessage.get("message"));
+          gui.setData(parsedMessage.get("message"), parsedMessage.get("image"));
+        } else if (parsedMessage.containsKey("message")) {
+          gui.setCaption(parsedMessage.get("message"));
         }
+        // gui.notify();
 
       }
 

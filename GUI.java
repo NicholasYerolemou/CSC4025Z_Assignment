@@ -157,7 +157,7 @@ public class GUI {
     private void encodeImage() {
         if (imageBytes != null) {
             String imageString = Base64.getEncoder().encodeToString(imageBytes);
-            client.sendMessage(imageString);
+            client.sendMessage(captionArea.getText(), imageString);
 
             encodedImageArea.setText(imageString);
         } else {
@@ -171,12 +171,29 @@ public class GUI {
             String imageString = Base64.getEncoder().encodeToString(imageBytes);
             String caption = captionArea.getText();
 
-            client.sendMessage(imageString);
+            client.sendMessage(caption, imageString);
 
             JOptionPane.showMessageDialog(frame, "Image and caption sent successfully");
         } else {
             JOptionPane.showMessageDialog(frame, "Please select an image first!");
         }
+    }
+
+    public void setCaption(String message) {
+        captionArea.setText(message);
+    }
+
+    public void setData(String message, String image) {
+        captionArea.setText(message);
+        byte[] imageByte = Base64.getDecoder().decode(image);
+        imageBytes = imageByte;
+        encodedImageArea.setText(image);
+    }
+
+    public void setImage(String imageString) {
+        byte[] imageByte = Base64.getDecoder().decode(imageString);
+        imageBytes = imageByte;
+        encodedImageArea.setText(imageString);
     }
 
     // Main method to run the GUI application

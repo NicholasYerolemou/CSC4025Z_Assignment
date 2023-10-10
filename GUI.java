@@ -8,7 +8,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.util.Base64;
 
-
 public class GUI {
 
     Client client;
@@ -27,7 +26,7 @@ public class GUI {
         frame = new JFrame("Image Caption Application");
         frame.setSize(600, 600);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        //frame.setLayout(new FlowLayout());
+        // frame.setLayout(new FlowLayout());
         frame.setLayout(new BorderLayout());
 
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -35,16 +34,16 @@ public class GUI {
 
         // Button to select an image
         JButton selectImageButton = new JButton("Select Image");
-        //frame.add(selectImageButton);
+        // frame.add(selectImageButton);
         topPanel.add(selectImageButton);
 
         // Text field to display the file path of the selected image
         filePathField = new JTextField(30);
         filePathField.setEditable(false);
-        //frame.add(filePathField);
+        // frame.add(filePathField);
         topPanel.add(filePathField);
 
-        //Image preview label
+        // Image preview label
         imagePreviewLabel = new JLabel();
         frame.add(imagePreviewLabel);
 
@@ -54,15 +53,15 @@ public class GUI {
         captionArea.setLineWrap(true);
         captionArea.setBorder(BorderFactory.createTitledBorder("Caption"));
         JScrollPane captionScrollPane = new JScrollPane(captionArea);
-        //frame.add(captionScrollPane);
+        // frame.add(captionScrollPane);
         topPanel.add(captionScrollPane);
 
         // Button to encode the image
         JButton encodeButton = new JButton("Encode Image");
-        //frame.add(encodeButton);
+        // frame.add(encodeButton);
         topPanel.add(encodeButton);
 
-        //Button to send the image and the caption
+        // Button to send the image and the caption
         sendButton = new JButton("Send");
         frame.add(sendButton);
 
@@ -73,7 +72,7 @@ public class GUI {
         encodedImageArea.setEditable(false);
         encodedImageArea.setBorder(BorderFactory.createTitledBorder("Encoded Image"));
         JScrollPane encodedScrollPane = new JScrollPane(encodedImageArea);
-        //frame.add(encodedScrollPane);
+        // frame.add(encodedScrollPane);
 
         imagePreviewLabel = new JLabel();
         imagePreviewLabel.setBorder(BorderFactory.createTitledBorder("Image Preview"));
@@ -98,7 +97,7 @@ public class GUI {
             }
         });
 
-        //Action listener for the "Send" button
+        // Action listener for the "Send" button
         sendButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -125,9 +124,9 @@ public class GUI {
                 ImageIO.write(image, "jpg", baos);
                 imageBytes = baos.toByteArray();
 
-                //Define maximum dimensions for the image preview
+                // Define maximum dimensions for the image preview
                 int maxWidth = 200;
-                int maxHeight =200;
+                int maxHeight = 200;
                 ImageIcon imageIcon = new ImageIcon(image);
                 Image scaledImage = imageIcon.getImage().getScaledInstance(maxWidth, -1, Image.SCALE_SMOOTH);
 
@@ -135,10 +134,10 @@ public class GUI {
                     scaledImage = imageIcon.getImage().getScaledInstance(-1, maxHeight, Image.SCALE_SMOOTH);
                 }
 
-                //Calculate the aspect ratio of the image
+                // Calculate the aspect ratio of the image
                 double aspectRatio = (double) image.getWidth() / image.getHeight();
 
-                //Calculate new dimensions based on the aspect ratio
+                // Calculate new dimensions based on the aspect ratio
                 int newWidth = maxWidth;
                 int newHeight = (int) (newWidth / aspectRatio);
 
@@ -166,7 +165,7 @@ public class GUI {
         }
     }
 
-    //Method to send the image and caption
+    // Method to send the image and caption
     private void sendImageAndCaption() {
         if (imageBytes != null) {
             String imageString = Base64.getEncoder().encodeToString(imageBytes);
@@ -181,13 +180,12 @@ public class GUI {
     }
 
     // Main method to run the GUI application
-    public static void main(String[] args) {
-        // SwingUtilities.invokeLater(new Runnable() {
-        //     @Override
-        //     public void run() {
-        //         new GUI();
-        //     }
-        // });
-    }
+    // public static void main(String[] args) {
+    // SwingUtilities.invokeLater(new Runnable() {
+    // @Override
+    // public void run() {
+    // new GUI();
+    // }
+    // });
+    // }
 }
-

@@ -43,13 +43,13 @@ import javax.crypto.BadPaddingException;
 import java.security.SecureRandom;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.crypto.params.ParametersWithIV;
-import org.bouncycastle.crypto.engines.AESEngine;
-import org.bouncycastle.crypto.modes.CBCBlockCipher;
-import org.bouncycastle.crypto.paddings.PaddedBufferedBlockCipher;
-import org.bouncycastle.crypto.CipherParameters;
-import org.bouncycastle.crypto.params.KeyParameter;
+// import org.bouncycastle.jce.provider.BouncyCastleProvider;
+// import org.bouncycastle.crypto.params.ParametersWithIV;
+// import org.bouncycastle.crypto.engines.AESEngine;
+// import org.bouncycastle.crypto.modes.CBCBlockCipher;
+// import org.bouncycastle.crypto.paddings.PaddedBufferedBlockCipher;
+// import org.bouncycastle.crypto.CipherParameters;
+// import org.bouncycastle.crypto.params.KeyParameter;
 
 public class Client {
 
@@ -422,7 +422,7 @@ public class Client {
     // Create a Cipher for Encryption
     Cipher cipher = Cipher.getInstance("AES");
     // use session key to encrypt it all
-    cipher.init(Cipher.ENCRYPT_MODE, sessionKey, new IvParameterSpec(iv));
+    cipher.init(Cipher.ENCRYPT_MODE, sessionKey);
     byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
     System.out.println("Encryption message size:" + messageBytes.length);
     System.out.println("Encryption message modulo:" + messageBytes.length % 16);
@@ -442,7 +442,7 @@ public class Client {
         iv.length);
     // Create a Cipher for Decryption
     Cipher cipher = Cipher.getInstance("AES");
-    cipher.init(Cipher.DECRYPT_MODE, sessionKey, new IvParameterSpec(iv));
+    cipher.init(Cipher.DECRYPT_MODE, sessionKey);
 
     // Assuming you have the encrypted message as a byte array
     byte[] encryptedMessage = Base64.getDecoder().decode(message.getBytes(StandardCharsets.UTF_8)); //
@@ -619,8 +619,8 @@ public class Client {
   }
 
   public static void main(String[] args) {
-    Security.addProvider(new BouncyCastleProvider());
-    // client = new Client(args[0]);
-    client = new Client("Bob");
+    // Security.addProvider(new BouncyCastleProvider());
+    client = new Client(args[0]);
+    // client = new Client("Bob");
   }
 }

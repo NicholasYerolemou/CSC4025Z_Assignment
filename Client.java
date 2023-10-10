@@ -1,4 +1,5 @@
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -7,6 +8,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -21,6 +23,8 @@ import java.security.PublicKey;
 import java.security.Security;
 import java.security.Signature;
 import java.security.SignatureException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.security.PrivateKey;
@@ -31,6 +35,10 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import javax.security.auth.x500.X500Principal;
+
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.jce.PKCS10CertificationRequest;
+import org.bouncycastle.x509.X509V1CertificateGenerator;
 
 public class Client {
 
@@ -107,15 +115,32 @@ public class Client {
                     KeyFactory keyFactory = KeyFactory.getInstance("RSA");
                     X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(CA_publicKeyBytes);
                     PublicKey CA_PublicKey = keyFactory.generatePublic(publicKeySpec);
+                    
+                    // Generate CSR
+                    PKCS10CertificationRequest csr = generateCSR(keyPair, username);
+                    
+                    // Convert CSR to String
+                    byte[] csrBytes = csr.getEncoded();
+                    String csrString = Base64.getEncoder().encodeToString(csrBytes);
+                    
+                    // Sign CSR with private key
+                    csrString = signWithPrivateKey(csrString); // the signWithPrivateKey method still needs to be implemented
 
-                    // Create a CSR certificate signing request using
-                    // PKCS10CertificationRequestBuilder in bouncy castle
-                    // Sign CSR with your private key
-                    // Send to CA who will verify the CSR and then sign your public key and other
-                    // relevant information with their private key, creating a digital certificate.
-                    // They send the digital certificate back to you
+                    // Send CSR to CA
+                    outputStream.println(csrString);
 
-                    System.out.println("Certificate recieved.");
+                    // Receive certificate from CA
+                    String certificateString = inputStream.readLine();
+                    System.out.println("Received certificate.");
+
+                    try {
+                        // Convert the certificate from String to X509Certificate
+                        byte[] certificateBytes = Base64.getDecoder().decode(certificateString);
+                        CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+                        X509Certificate certificate = (X509Certificate) certificateFactory.generateCertificate(new ByteArrayInputStream(certificateBytes));
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
 
                 } else {
                     System.out.println("The hash recieved did not match the CAs public key.");
@@ -131,6 +156,21 @@ public class Client {
 
         }
 
+    }
+
+    private PKCS10CertificationRequest generateCSR(KeyPair keyPair, String username) {
+        try {
+            return new PKCS10CertificationRequest(
+                "SHA256withRSA",
+                new X500Principal("CN=" + username),
+                keyPair.getPublic(),
+                null,
+                keyPair.getPrivate());
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
     private Socket connectToCA() {
@@ -414,7 +454,8 @@ public class Client {
     }
 
     public static void main(String[] args) {
-        // Security.addProvider(new BouncyCastleProvider());
+        Security.addProvider(new BouncyCastleProvider());
         client = new Client(args[0]);
     }
 }
+

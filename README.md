@@ -2,6 +2,9 @@
 
 CSC4028Z honours network and inter-network security assignment
 
+To run the code using bouncy castle, enter export CLASSPATH=“path to bouncycastle.jar”:. (without any "") at the start of your terminal session.
+
+
 To test client/server code
 
 1. Compile with "make all"

@@ -269,7 +269,7 @@ public class Client {
         sessionKey = keyGenerator.generateKey();
 
         byte[] encryptedMessage = sessionKey.getEncoded();
-        // encryptedMessage = encryptRSA(encryptedMessage);
+        encryptedMessage = encryptRSA(encryptedMessage);
 
         String encodedMessage = Base64.getEncoder().encodeToString(encryptedMessage);
         outputStream.println(encodedMessage); // send message
@@ -281,7 +281,7 @@ public class Client {
         String message = inputStream.readLine();
         byte[] decodedMessage = Base64.getDecoder().decode(message);
 
-        // decodedMessage = decryptRSA(decodedMessage);
+        decodedMessage = decryptRSA(decodedMessage);
         sessionKey = new SecretKeySpec(decodedMessage, "AES");
       }
 
@@ -334,16 +334,17 @@ public class Client {
   private byte[] encryptRSA(byte[] messageBytes) {
 
     try {
+
       // encrypt with their public key
-      Cipher cipher = Cipher.getInstance("RSA");
+      Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
       cipher.init(Cipher.ENCRYPT_MODE, otherClientPublicKey);
-      byte[] sessionKey_otherPublicKey = cipher.doFinal(messageBytes);
+      byte[] encryptedBytes = cipher.doFinal(messageBytes);
 
-      // enrypt with our private key
-      cipher.init(Cipher.ENCRYPT_MODE, keyPair.getPrivate());
-      byte[] encryptedMessage = cipher.doFinal(sessionKey_otherPublicKey);
+      // encrypt with our private key
+      // cipher.init(Cipher.ENCRYPT_MODE, keyPair.getPrivate());
+      // encryptedBytes = cipher.doFinal(encryptedBytes);
 
-      return encryptedMessage;
+      return encryptedBytes;
     } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | IllegalBlockSizeException
         | BadPaddingException e) {
       e.printStackTrace();
@@ -352,19 +353,22 @@ public class Client {
   }
 
   private byte[] decryptRSA(byte[] messageBytes) {
-    // byte[] messageBytes = message.getBytes();
-
-    // decrypt the message
-    Cipher cipher;
 
     try {
-      cipher = Cipher.getInstance("RSA");
-      cipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate());
-      byte[] halfDecryptedMessage = cipher.doFinal(messageBytes);
-      cipher.init(Cipher.DECRYPT_MODE, otherClientPublicKey);
-      byte[] decryptedMessage = cipher.doFinal(halfDecryptedMessage);
 
-      return decryptedMessage;
+      byte[] decryptedBytes = messageBytes;
+      Cipher cipher;
+
+      // decrypt with their public key
+      // cipher.init(Cipher.DECRYPT_MODE, otherClientPublicKey);
+      // decryptedBytes = cipher.doFinal(decryptedBytes);
+
+      // decrypt our private key
+      cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+      cipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate());
+      decryptedBytes = cipher.doFinal(decryptedBytes);
+
+      return decryptedBytes;
     } catch (NoSuchAlgorithmException | NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException
         | InvalidKeyException e) {
 

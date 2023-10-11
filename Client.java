@@ -50,32 +50,20 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.BadPaddingException;
 import java.security.SecureRandom;
 import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.IvParameterSpec;
-// import org.bouncycastle.jce.provider.BouncyCastleProvider;
-// import org.bouncycastle.crypto.params.ParametersWithIV;
-// import org.bouncycastle.crypto.engines.AESEngine;
-// import org.bouncycastle.crypto.modes.CBCBlockCipher;
-// import org.bouncycastle.crypto.paddings.PaddedBufferedBlockCipher;
-// import org.bouncycastle.crypto.CipherParameters;
-// import org.bouncycastle.crypto.params.KeyParameter;
 
 public class Client {
 
   static Client client;
   SecretKey sessionKey;
-  private PublicKey publicKey;
-  private PrivateKey privateKey;
   private GUI gui;
+  PublicKey sendingClientPublicKey;
 
   private KeyPair keyPair;
   private static boolean connected = false;
   private Socket targetSocket = null;// the socket if the client you are connected to
   private String username;
-  private byte[] iv;
 
   public Client(String name) {
-    // Security.addProvider(new BouncyCastleProvider());
-
     username = name;
     if (name.equalsIgnoreCase("Alice")) {
       generateKeys();
@@ -89,7 +77,6 @@ public class Client {
       System.out.println("Not a valid username. Enter either Alice or Bob");
       System.exit(1);
     }
-    // gui = new GUI(this);
   }
 
   private void generateKeys() {
@@ -254,7 +241,7 @@ public class Client {
       listenForMessages();
 
       // socket.close();
-    } catch (IOException e) {
+    } catch (Exception e) {
       System.err.println("Error connecting to other client: " + e.getMessage());
     }
   }
@@ -294,12 +281,11 @@ public class Client {
           SecureRandom random = new SecureRandom();
           byte[] generatedIv = new byte[16];
           random.nextBytes(generatedIv);
-          iv = generatedIv;
           String ivString = Base64.getEncoder().encodeToString(generatedIv);
           String ivStringHash = calculateHash(ivString);
           byte[] tagbytes = new byte[16];
           random.nextBytes(tagbytes);
-          authTag = tagbytes;
+          // authTag = tagbytes;
           String tagBytesString = Base64.getEncoder().encodeToString(tagbytes);
           String tagBytesStringHash = calculateHash(tagBytesString);
 
@@ -316,36 +302,21 @@ public class Client {
           String[] data = message.split(",");
           String sessionKeyString = data[0];
           String sessionKeyHash = data[1];
-          String ivString = data[2];
-          String ivStringHash = data[3];
-          System.out.println("Session key has been retrieved");
-          System.out.println("IV has been received");
 
-          if (verifyHash(sessionKeyString, sessionKeyHash) && verifyHash(ivString, ivStringHash)) {
-            System.out.println("Session key has been verified");
-            System.out.println("IV has been verified");
-
+          if (verifyHash(sessionKeyString, sessionKeyHash)) {
             byte[] receivedSessionKeyBytes = Base64.getDecoder().decode(sessionKeyString);
             sessionKey = new SecretKeySpec(receivedSessionKeyBytes, "AES");
-
-            byte[] ivDecoded = Base64.getDecoder().decode(ivString);
-            iv = ivDecoded;
           } else {
             System.out.println("Session key recieved does not match message hash.");
             // resend message requesting session key
           }
 
         }
-
-        // encode session key with our private key
-        // ecnode session key with their public key
-        // send session key
-        // store session key locally
       }
 
       System.out.println("Session created.");
 
-    } catch (IOException | NoSuchAlgorithmException e) {
+    } catch (Exception e) {
       System.out.println("Failed to create writer to client" + e.getMessage());
     }
   }
@@ -363,24 +334,6 @@ public class Client {
       System.out.println("Listening for user input.");
       System.out.println(this);
       gui = new GUI(this);
-
-      // Create output stream
-      // PrintWriter out = null;
-
-      // try {
-
-      // out = new PrintWriter(targetSocket.getOutputStream(), true);
-      // } catch (IOException e) {
-      // System.out.println("Failed to create writer to client" + e.getMessage());
-      // }
-
-      // while (connected) {
-      // // listen for user input
-      // Scanner scanner = new Scanner(System.in);
-      // String userInput = scanner.nextLine();
-      // sendMessage(userInput, out);
-
-      // }
     });
     userListenerThread.start();
 
@@ -430,28 +383,36 @@ public class Client {
    *
    * Message structure below(newline delimiter):
    * Message-Hash: <hash of message>
-   * Certificate: <certificate of sender>
    * Message: <message>
    * Image: <image>
+   * Image-Dimensions: <dimensions>
    * 
-   * @param certificate The certificate of the client sending the message
-   * @param message     The message to be sent
-   * @param image       The image to be sent
+   * @param message The message to be sent
+   * @param image   The image to be sent
    * @return The message protocol to be sent to the other client
    */
-  private String messageGenerator(String certificate, String message, String image) throws NoSuchAlgorithmException {
-    StringBuilder messageProtocol = new StringBuilder();
-    messageProtocol.append("Certificate: ").append(certificate).append("\n");
-    messageProtocol.append("Message: ").append(message).append("\n");
-    if (image != null)
-      messageProtocol.append("Image: ").append(image).append("\n");
-    String temp = messageProtocol.toString();
-    // hash message
-    String messageHash = calculateHash(temp);
-    String messageHashLine = "Message-Hash: " + messageHash + "\n";
-    // create combination of message and hash
-    messageProtocol.insert(0, messageHashLine);
-    return messageProtocol.toString();
+  private String messageGenerator(String message, ImageData image) {
+    try {
+      StringBuilder messageProtocol = new StringBuilder();
+      messageProtocol.append("Message: ").append(message).append("\n");
+      if (image != null) {
+        messageProtocol.append("Image: ").append(image).append("\n");
+        messageProtocol.append("Image-Dimensions: ").append(image.getWidth()).append(",").append(image.getHeight())
+            .append("\n");
+      }
+
+      String temp = messageProtocol.toString();
+      // hash message
+      String messageHash = calculateHash(temp);
+      String messageHashLine = "Message-Hash: " + messageHash + "\n";
+      // create combination of message and hash
+      messageProtocol.insert(0, messageHashLine);
+      return messageProtocol.toString();
+    } catch (Exception e) {
+      // TODO: handle exception
+      e.printStackTrace();
+      return "";
+    }
   }
 
   /**
@@ -460,15 +421,21 @@ public class Client {
    * @param message The message protocol to be encrypted
    * @return The encrypted message protocol
    */
-  private String encryptMessage(String message) throws Exception {
-    // Create a Cipher for Encryption
-    Cipher cipher = Cipher.getInstance("AES");
-    // use session key to encrypt it all
-    cipher.init(Cipher.ENCRYPT_MODE, sessionKey);
-    byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
-    // Encrypt the Message
-    byte[] encryptedMessage = cipher.doFinal(messageBytes);
-    return Base64.getEncoder().encodeToString(encryptedMessage);
+  private String encryptMessage(String message) {
+    try {
+      // Create a Cipher for Encryption
+      Cipher cipher = Cipher.getInstance("AES");
+      // use session key to encrypt it all
+      cipher.init(Cipher.ENCRYPT_MODE, sessionKey);
+      byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
+      // Encrypt the Message
+      byte[] encryptedMessage = cipher.doFinal(messageBytes);
+      return Base64.getEncoder().encodeToString(encryptedMessage);
+    } catch (Exception e) {
+      // TODO: handle exception
+      e.printStackTrace();
+      return "";
+    }
   }
 
   /**
@@ -477,20 +444,26 @@ public class Client {
    * @param message The message protocol to be decrypted
    * @return The decrypted message protocol
    */
-  private String decryptMessage(String message) throws Exception {
-    // Create a Cipher for Decryption
-    Cipher cipher = Cipher.getInstance("AES");
-    cipher.init(Cipher.DECRYPT_MODE, sessionKey);
+  private String decryptMessage(String message) {
+    try {
+      // Create a Cipher for Decryption
+      Cipher cipher = Cipher.getInstance("AES");
+      cipher.init(Cipher.DECRYPT_MODE, sessionKey);
 
-    // Assuming you have the encrypted message as a byte array
-    byte[] encryptedMessage = Base64.getDecoder().decode(message.getBytes(StandardCharsets.UTF_8)); //
-    // Replace with your encrypted message bytes
-    byte[] decryptedMessageBytes = cipher.doFinal(encryptedMessage);
-    //
-    // Convert the decrypted byte array to a string
-    String decryptedMessage = new String(decryptedMessageBytes,
-        StandardCharsets.UTF_8);
-    return decryptedMessage;
+      // Assuming you have the encrypted message as a byte array
+      byte[] encryptedMessage = Base64.getDecoder().decode(message.getBytes(StandardCharsets.UTF_8)); //
+      // Replace with your encrypted message bytes
+      byte[] decryptedMessageBytes = cipher.doFinal(encryptedMessage);
+      //
+      // Convert the decrypted byte array to a string
+      String decryptedMessage = new String(decryptedMessageBytes,
+          StandardCharsets.UTF_8);
+      return decryptedMessage;
+    } catch (Exception e) {
+      // TODO: handle exception
+      e.printStackTrace();
+      return "";
+    }
   }
 
   /**
@@ -499,19 +472,15 @@ public class Client {
    * @param message The message protocol to be decrypted
    * @return The decrypted message protocol
    */
-  private void sendMessageExecutor(String message, String image) {
+  private void sendMessageExecutor(String message, ImageData image) {
     try {
       PrintWriter outputStream = new PrintWriter(targetSocket.getOutputStream(), true);
-      // System.out.println("Message sent: " + message + ".");
-      // TODO: Place the actual certificate here
-      String messageToSend = messageGenerator("certificate", message, image);
+      String messageToSend = messageGenerator(message, image);
       String encryptedMessage = encryptMessage(messageToSend);
       outputStream.println(encryptedMessage); // Send a message
-      System.out.println("Message has been sent");
     } catch (Exception e) {
       // TODO Auto-generated catch block
       e.printStackTrace();
-      System.out.println("Unable to send message. " + e.getMessage());
     }
   }
 
@@ -530,7 +499,7 @@ public class Client {
    * @param message The message to be sent
    * @param image   The image to be sent
    */
-  public void sendMessage(String message, String image) {
+  public void sendMessage(String message, ImageData image) {
     sendMessageExecutor(message, image);
   }
 
@@ -543,12 +512,12 @@ public class Client {
 
       if (keyName.equals("message-hash"))
         result.put("message-hash", lineSplit[1].trim());
-      else if (keyName.equals("certificate"))
-        result.put("certificate", lineSplit[1].trim());
       else if (keyName.equals("message"))
         result.put("message", lineSplit[1].trim());
       else if (keyName.equals("image"))
         result.put("image", lineSplit[1].trim());
+      else if (keyName.equals("image-dimensions"))
+        result.put("image-dimensions", lineSplit[1].trim());
     }
 
     return result;
@@ -569,12 +538,14 @@ public class Client {
       if (verifyHash(messageWithoutHash, receivedHash)) {
         Map<String, String> parsedMessage = parseMessage(messageLines);
         if (parsedMessage.containsKey("message") && parsedMessage.containsKey("image")) {
-          System.out.println("Message: " + parsedMessage.get("message"));
-          gui.setData(parsedMessage.get("message"), parsedMessage.get("image"));
+          int imageWidth = Integer.parseInt(parsedMessage.get("image-dimensions").split(",")[0].trim());
+          int imageHeight = Integer.parseInt(parsedMessage.get("image-dimensions").split(",")[1].trim());
+          String encodedImage = parsedMessage.get("image");
+          ImageData image = new ImageData(imageHeight, imageWidth, encodedImage);
+          gui.setData(parsedMessage.get("message"), image);
         } else if (parsedMessage.containsKey("message")) {
-          gui.setCaption(parsedMessage.get("message"));
+          gui.setData(parsedMessage.get("message"), null);
         }
-        // gui.notify();
 
       }
 
@@ -583,35 +554,6 @@ public class Client {
       e.printStackTrace();
       System.out.println("Unable to receive message. " + e.getMessage());
     }
-    // Process the incoming message here
-    // use session key to decrypt the message
-    // Remove hash from message
-    // compue hash on message without hash compare with hash
-    // decode the message
-    // display/print out the message
-    // System.out.println("Message Recieved: " + message);
-  }
-
-  /**
-   * This method is used to send an image to the other client.
-   *
-   * @param image The image to be sent
-   */
-  private String encodeImageToString(byte[] imageBytes) throws IOException {
-    return Base64.getEncoder().encodeToString(imageBytes);
-  }
-
-  /**
-   * This method is used to decode an image from a Base64 string.
-   *
-   * @param base64EncodedImage The Base64 string to be decoded
-   * @param outputPath         The path to save the decoded image
-   */
-  private void decodeImageFromString(String base64EncodedImage, String outputPath) throws IOException {
-    byte[] decodedBytes = Base64.getDecoder().decode(base64EncodedImage);
-    FileOutputStream imageOutputStream = new FileOutputStream(outputPath);
-    imageOutputStream.write(decodedBytes);
-    imageOutputStream.close();
   }
 
   /**
@@ -620,20 +562,25 @@ public class Client {
    * @param message The message to be hashed
    * @return The hash of the message
    */
-  private String calculateHash(String message) throws NoSuchAlgorithmException {
-    MessageDigest md = MessageDigest.getInstance("SHA-256");
-    byte[] hashBytes = md.digest(message.getBytes());
-
-    // Convert the byte array to a hexadecimal representation
-    StringBuilder hexString = new StringBuilder();
-    for (byte hashByte : hashBytes) {
-      String hex = Integer.toHexString(0xff & hashByte);
-      if (hex.length() == 1) {
-        hexString.append('0');
-      }
-      hexString.append(hex);
+  private String calculateHash(String message) {
+    try {
+      // Get the private key for signing
+      PrivateKey privateKey = keyPair.getPrivate();
+      MessageDigest md = MessageDigest.getInstance("SHA-256");
+      byte[] hashBytes = md.digest(message.getBytes());
+      // Initialize a Signature object with the private key
+      Signature signature = Signature.getInstance("SHA256withRSA");
+      signature.initSign(privateKey);
+      // Update the signature with the hash of the data
+      signature.update(hashBytes);
+      // Sign the data
+      byte[] digitalSignature = signature.sign();
+      return Base64.getEncoder().encodeToString(digitalSignature);
+    } catch (Exception e) {
+      // TODO: handle exception
+      e.printStackTrace();
+      return "";
     }
-    return hexString.toString();
   }
 
   /**
@@ -643,12 +590,22 @@ public class Client {
    * @param recievedHash The hash to be compared against
    * @return True if the hashes match, false otherwise
    */
-  private boolean verifyHash(String message, String recievedHash) throws NoSuchAlgorithmException {
-    String messageHash = calculateHash(message);
-    if (messageHash.equals(recievedHash)) {
-      return true;
-    } else
+  private boolean verifyHash(String message, String recievedHash) {
+    try {
+      // Create a hash of the data using SHA-256
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      byte[] hash = digest.digest(message.getBytes());
+      byte[] ditigalSignature = Base64.getDecoder().decode(recievedHash);
+      Signature signature = Signature.getInstance("SHA256withRSA");
+      // To verify the signature using the public key
+      signature.initVerify(sendingClientPublicKey);
+      signature.update(hash);
+      return signature.verify(ditigalSignature);
+    } catch (Exception e) {
+      // TODO: handle exception
+      e.printStackTrace();
       return false;
+    }
   }
 
   private String signWithPrivateKey(String message) {

@@ -19,6 +19,7 @@ public class GUI {
     private JLabel imagePreviewLabel; // Added for image preview
     private byte[] imageBytes; // To store the image data as bytes
     private JButton sendButton; // Added for sending the image
+    private ImageData imageData; // To store the image data as ImageData object
 
     public GUI(Client client) {
         this.client = client;
@@ -117,36 +118,8 @@ public class GUI {
             try {
                 File selectedFile = fileChooser.getSelectedFile();
                 filePathField.setText(selectedFile.getAbsolutePath());
-
-                // Read the selected image into a BufferedImage and store it as bytes
-                BufferedImage image = ImageIO.read(selectedFile);
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                ImageIO.write(image, "jpg", baos);
-                imageBytes = baos.toByteArray();
-
-                // Define maximum dimensions for the image preview
-                int maxWidth = 200;
-                int maxHeight = 200;
-                ImageIcon imageIcon = new ImageIcon(image);
-                Image scaledImage = imageIcon.getImage().getScaledInstance(maxWidth, -1, Image.SCALE_SMOOTH);
-
-                if (scaledImage.getHeight(null) > maxHeight) {
-                    scaledImage = imageIcon.getImage().getScaledInstance(-1, maxHeight, Image.SCALE_SMOOTH);
-                }
-
-                // Calculate the aspect ratio of the image
-                double aspectRatio = (double) image.getWidth() / image.getHeight();
-
-                // Calculate new dimensions based on the aspect ratio
-                int newWidth = maxWidth;
-                int newHeight = (int) (newWidth / aspectRatio);
-
-                if (newHeight > maxHeight) {
-                    newHeight = maxHeight;
-                    newWidth = (int) (newHeight * aspectRatio);
-                }
-                imagePreviewLabel.setIcon(new ImageIcon(scaledImage));
-
+                imageData = new ImageData(selectedFile);
+                imagePreviewLabel.setIcon(imageData.resizeImage());
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
@@ -157,7 +130,7 @@ public class GUI {
     private void encodeImage() {
         if (imageBytes != null) {
             String imageString = Base64.getEncoder().encodeToString(imageBytes);
-            client.sendMessage(captionArea.getText(), imageString);
+            client.sendMessage(captionArea.getText(), imageData);
 
             encodedImageArea.setText(imageString);
         } else {
@@ -167,11 +140,10 @@ public class GUI {
 
     // Method to send the image and caption
     private void sendImageAndCaption() {
-        if (imageBytes != null) {
-            String imageString = Base64.getEncoder().encodeToString(imageBytes);
+        if (imageData != null) {
             String caption = captionArea.getText();
 
-            client.sendMessage(caption, imageString);
+            client.sendMessage(caption, imageData);
 
             JOptionPane.showMessageDialog(frame, "Image and caption sent successfully");
         } else {
@@ -179,30 +151,18 @@ public class GUI {
         }
     }
 
-    public void setCaption(String message) {
-        captionArea.setText(message);
+    private void previewImage(ImageData tempImage) {
+        imagePreviewLabel.setIcon(tempImage.resizeImage());
+
     }
 
-    public void setData(String message, String image) {
-        captionArea.setText(message);
-        byte[] imageByte = Base64.getDecoder().decode(image);
-        imageBytes = imageByte;
-        encodedImageArea.setText(image);
+    public void setData(String message, ImageData image) {
+        if (message != null)
+            captionArea.setText(message);
+        if (image != null) {
+            imageBytes = image.getBytes();
+            encodedImageArea.setText(image.encodeImage());
+            previewImage(image);
+        }
     }
-
-    public void setImage(String imageString) {
-        byte[] imageByte = Base64.getDecoder().decode(imageString);
-        imageBytes = imageByte;
-        encodedImageArea.setText(imageString);
-    }
-
-    // Main method to run the GUI application
-    // public static void main(String[] args) {
-    // SwingUtilities.invokeLater(new Runnable() {
-    // @Override
-    // public void run() {
-    // new GUI();
-    // }
-    // });
-    // }
 }

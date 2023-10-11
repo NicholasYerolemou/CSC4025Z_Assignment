@@ -53,7 +53,6 @@ import java.security.SecureRandom;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 
-
 public class Client {
 
   static Client client;
@@ -62,15 +61,13 @@ public class Client {
   private PublicKey CA_PublicKey;
   private PublicKey otherClientPublicKey;
   X509Certificate certificate;
+
   private KeyPair keyPair;
   private static boolean connected = false;
   private Socket targetSocket = null;// the socket if the client you are connected to
   private String username;
-  private byte[] iv;
 
   public Client(String name) {
-    // Security.addProvider(new BouncyCastleProvider());
-
     username = name;
     if (name.equalsIgnoreCase("Alice")) {
       generateKeys();
@@ -84,7 +81,6 @@ public class Client {
       System.out.println("Not a valid username. Enter either Alice or Bob");
       System.exit(1);
     }
-    // gui = new GUI(this);
   }
 
   private void generateKeys() {
@@ -94,7 +90,6 @@ public class Client {
       keyPairGenerator = KeyPairGenerator.getInstance("RSA");
       keyPairGenerator.initialize(2048);
       keyPair = keyPairGenerator.generateKeyPair();
-     
 
     } catch (NoSuchAlgorithmException e) {
       System.out.println("Unable to create key pair generator.");
@@ -122,24 +117,19 @@ public class Client {
         // request certificate
         outputStream.println("0");
 
-
         try {
-        // get CAs certificate and extract public key
-        String CACertString = inputStream.readLine();
-        byte[] CACertBytes = Base64.getDecoder().decode(CACertString);
-        CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
-        X509Certificate CA_certificate = (X509Certificate) certificateFactory
+          // get CAs certificate and extract public key
+          String CACertString = inputStream.readLine();
+          byte[] CACertBytes = Base64.getDecoder().decode(CACertString);
+          CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+          X509Certificate CA_certificate = (X509Certificate) certificateFactory
               .generateCertificate(new ByteArrayInputStream(CACertBytes));
-              CA_certificate.checkValidity();
-              System.out.println("CA's certificate verified, extracting public key");
-              CA_PublicKey = CA_certificate.getPublicKey();
-        }
-        catch (CertificateException e)
-        {
+          CA_certificate.checkValidity();
+          System.out.println("CA's certificate verified, extracting public key");
+          CA_PublicKey = CA_certificate.getPublicKey();
+        } catch (CertificateException e) {
           e.printStackTrace(outputStream);
         }
-
-  
 
         // Generate CSR
         PKCS10CertificationRequest csr = generateCSR(keyPair, username);
@@ -158,7 +148,7 @@ public class Client {
         try {
           // Convert the certificate from String to X509Certificate
           byte[] certificateBytes = Base64.getDecoder().decode(certificateString);
-         CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+          CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
           certificate = (X509Certificate) certificateFactory
               .generateCertificate(new ByteArrayInputStream(certificateBytes));
         } catch (Exception e) {
@@ -249,7 +239,7 @@ public class Client {
       listenForMessages();
 
       // socket.close();
-    } catch (IOException e) {
+    } catch (Exception e) {
       System.err.println("Error connecting to other client: " + e.getMessage());
     }
   }
@@ -262,15 +252,14 @@ public class Client {
     System.out.println("Creating session.");
     PrintWriter outputStream = null;
     BufferedReader inputStream = null;
-    String response;                        
+    String response;
     try {
 
-     
       outputStream = new PrintWriter(targetSocket.getOutputStream(), true);
       inputStream = new BufferedReader(new InputStreamReader(targetSocket.getInputStream()));// get response from
                                                                                              // client
-     
-        if (username.equalsIgnoreCase("Alice")) {
+
+      if (username.equalsIgnoreCase("Alice")) {
 
           exchangeCertificates(outputStream, inputStream);
           
@@ -298,55 +287,50 @@ public class Client {
       }
 
       System.out.println("Session created.");
-      
-    } catch (Exception  e) {
+
+    } catch (Exception e) {
       System.out.println("Error in create session catch");
       e.printStackTrace(outputStream);
     }
   }
 
+  private void exchangeCertificates(PrintWriter outputStream, BufferedReader inputStream)
+      throws IOException, CertificateException {
+    if (username.equalsIgnoreCase("Alice")) {
+      // send this clients certificate certificate
+      byte[] certificateBytes = certificate.getEncoded();
+      String certificateString = Base64.getEncoder().encodeToString(certificateBytes);
+      outputStream.println(certificateString);
 
-private void exchangeCertificates(PrintWriter outputStream, BufferedReader inputStream) throws IOException, CertificateException
-{
-  if (username.equalsIgnoreCase("Alice"))
-  {
-      //send this clients certificate certificate 
-          byte[] certificateBytes = certificate.getEncoded();
-          String certificateString = Base64.getEncoder().encodeToString(certificateBytes);
-          outputStream.println(certificateString); 
-          
+      // get other clients certificate and extract public key
+      String otherCertString = inputStream.readLine();
+      byte[] otherCertBytes = Base64.getDecoder().decode(otherCertString);
+      CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+      X509Certificate other_Client_certificate = (X509Certificate) certificateFactory
+          .generateCertificate(new ByteArrayInputStream(otherCertBytes));
+      other_Client_certificate.checkValidity();
 
-          //get other clients certificate and extract public key
-          String otherCertString = inputStream.readLine();
-          byte[] otherCertBytes = Base64.getDecoder().decode(otherCertString);
-          CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
-          X509Certificate other_Client_certificate = (X509Certificate) certificateFactory
-              .generateCertificate(new ByteArrayInputStream(otherCertBytes));
-              other_Client_certificate.checkValidity();
-           
-              otherClientPublicKey = other_Client_certificate.getPublicKey();
+      otherClientPublicKey = other_Client_certificate.getPublicKey();
+    } else if (username.equalsIgnoreCase("Bob")) {
+      // get other clients certificate and extract public key
+      String otherCertString = inputStream.readLine();
+      byte[] otherCertBytes = Base64.getDecoder().decode(otherCertString);
+      CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+      X509Certificate other_Client_certificate = (X509Certificate) certificateFactory
+          .generateCertificate(new ByteArrayInputStream(otherCertBytes));
+      other_Client_certificate.checkValidity();
+
+      otherClientPublicKey = other_Client_certificate.getPublicKey();
+
+      // send this clients certificate certificate
+      byte[] certificateBytes = certificate.getEncoded();
+      String certificateString = Base64.getEncoder().encodeToString(certificateBytes);
+      outputStream.println(certificateString);
+
+    }
+
+    System.out.println("Certificates exchanged and verified.");
   }
-  else if (username.equalsIgnoreCase("Bob"))
-  {
-    //get other clients certificate and extract public key
-          String otherCertString = inputStream.readLine();
-          byte[] otherCertBytes = Base64.getDecoder().decode(otherCertString);
-          CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
-          X509Certificate other_Client_certificate = (X509Certificate) certificateFactory
-              .generateCertificate(new ByteArrayInputStream(otherCertBytes));
-              other_Client_certificate.checkValidity();
-              
-              otherClientPublicKey = other_Client_certificate.getPublicKey();
-          
-          //send this clients certificate certificate 
-          byte[] certificateBytes = certificate.getEncoded();
-          String certificateString = Base64.getEncoder().encodeToString(certificateBytes);
-          outputStream.println(certificateString); 
-       
-  }
-
-  System.out.println("Certificates exchanged and verified.");
-}
 
 private byte[] encryptRSA(byte[] messageBytes)
 {
@@ -376,7 +360,7 @@ private byte[] decryptRSA(byte[] messageBytes)
     
     //decrypt the message
     Cipher cipher;
- 
+
     try {
       cipher = Cipher.getInstance("RSA");
       cipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate());
@@ -392,8 +376,8 @@ private byte[] decryptRSA(byte[] messageBytes)
       System.out.println("Error thrown in decrypt RSA");
       return null;
     }
-    
-}
+
+  }
 
   private void listenForUserInput() {
     // Create another thread to listen for user input to trigger sending a message.
@@ -451,28 +435,36 @@ private byte[] decryptRSA(byte[] messageBytes)
    *
    * Message structure below(newline delimiter):
    * Message-Hash: <hash of message>
-   * Certificate: <certificate of sender>
    * Message: <message>
    * Image: <image>
+   * Image-Dimensions: <dimensions>
    * 
-   * @param certificate The certificate of the client sending the message
-   * @param message     The message to be sent
-   * @param image       The image to be sent
+   * @param message The message to be sent
+   * @param image   The image to be sent
    * @return The message protocol to be sent to the other client
    */
-  private String messageGenerator(String certificate, String message, String image) throws NoSuchAlgorithmException {
-    StringBuilder messageProtocol = new StringBuilder();
-    messageProtocol.append("Certificate: ").append(certificate).append("\n");
-    messageProtocol.append("Message: ").append(message).append("\n");
-    if (image != null)
-      messageProtocol.append("Image: ").append(image).append("\n");
-    String temp = messageProtocol.toString();
-    // hash message
-    String messageHash = calculateHash(temp);
-    String messageHashLine = "Message-Hash: " + messageHash + "\n";
-    // create combination of message and hash
-    messageProtocol.insert(0, messageHashLine);
-    return messageProtocol.toString();
+  private String messageGenerator(String message, ImageData image) {
+    try {
+      StringBuilder messageProtocol = new StringBuilder();
+      messageProtocol.append("Message: ").append(message).append("\n");
+      if (image != null) {
+        messageProtocol.append("Image: ").append(image).append("\n");
+        messageProtocol.append("Image-Dimensions: ").append(image.getWidth()).append(",").append(image.getHeight())
+            .append("\n");
+      }
+
+      String temp = messageProtocol.toString();
+      // hash message
+      String messageHash = calculateHash(temp);
+      String messageHashLine = "Message-Hash: " + messageHash + "\n";
+      // create combination of message and hash
+      messageProtocol.insert(0, messageHashLine);
+      return messageProtocol.toString();
+    } catch (Exception e) {
+      // TODO: handle exception
+      e.printStackTrace();
+      return "";
+    }
   }
 
   /**
@@ -481,15 +473,21 @@ private byte[] decryptRSA(byte[] messageBytes)
    * @param message The message protocol to be encrypted
    * @return The encrypted message protocol
    */
-  private String encryptMessage(String message) throws Exception {
-    // Create a Cipher for Encryption
-    Cipher cipher = Cipher.getInstance("AES");
-    // use session key to encrypt it all
-    cipher.init(Cipher.ENCRYPT_MODE, sessionKey);
-    byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
-    // Encrypt the Message
-    byte[] encryptedMessage = cipher.doFinal(messageBytes);
-    return Base64.getEncoder().encodeToString(encryptedMessage);
+  private String encryptMessage(String message) {
+    try {
+      // Create a Cipher for Encryption
+      Cipher cipher = Cipher.getInstance("AES");
+      // use session key to encrypt it all
+      cipher.init(Cipher.ENCRYPT_MODE, sessionKey);
+      byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
+      // Encrypt the Message
+      byte[] encryptedMessage = cipher.doFinal(messageBytes);
+      return Base64.getEncoder().encodeToString(encryptedMessage);
+    } catch (Exception e) {
+      // TODO: handle exception
+      e.printStackTrace();
+      return "";
+    }
   }
 
   /**
@@ -498,20 +496,26 @@ private byte[] decryptRSA(byte[] messageBytes)
    * @param message The message protocol to be decrypted
    * @return The decrypted message protocol
    */
-  private String decryptMessage(String message) throws Exception {
-    // Create a Cipher for Decryption
-    Cipher cipher = Cipher.getInstance("AES");
-    cipher.init(Cipher.DECRYPT_MODE, sessionKey);
+  private String decryptMessage(String message) {
+    try {
+      // Create a Cipher for Decryption
+      Cipher cipher = Cipher.getInstance("AES");
+      cipher.init(Cipher.DECRYPT_MODE, sessionKey);
 
-    // Assuming you have the encrypted message as a byte array
-    byte[] encryptedMessage = Base64.getDecoder().decode(message.getBytes(StandardCharsets.UTF_8)); //
-    // Replace with your encrypted message bytes
-    byte[] decryptedMessageBytes = cipher.doFinal(encryptedMessage);
-    //
-    // Convert the decrypted byte array to a string
-    String decryptedMessage = new String(decryptedMessageBytes,
-        StandardCharsets.UTF_8);
-    return decryptedMessage;
+      // Assuming you have the encrypted message as a byte array
+      byte[] encryptedMessage = Base64.getDecoder().decode(message.getBytes(StandardCharsets.UTF_8)); //
+      // Replace with your encrypted message bytes
+      byte[] decryptedMessageBytes = cipher.doFinal(encryptedMessage);
+      //
+      // Convert the decrypted byte array to a string
+      String decryptedMessage = new String(decryptedMessageBytes,
+          StandardCharsets.UTF_8);
+      return decryptedMessage;
+    } catch (Exception e) {
+      // TODO: handle exception
+      e.printStackTrace();
+      return "";
+    }
   }
 
   /**
@@ -520,19 +524,15 @@ private byte[] decryptRSA(byte[] messageBytes)
    * @param message The message protocol to be decrypted
    * @return The decrypted message protocol
    */
-  private void sendMessageExecutor(String message, String image) {
+  private void sendMessageExecutor(String message, ImageData image) {
     try {
       PrintWriter outputStream = new PrintWriter(targetSocket.getOutputStream(), true);
-      // System.out.println("Message sent: " + message + ".");
-      // TODO: Place the actual certificate here
-      String messageToSend = messageGenerator("certificate", message, image);
+      String messageToSend = messageGenerator(message, image);
       String encryptedMessage = encryptMessage(messageToSend);
       outputStream.println(encryptedMessage); // Send a message
-      System.out.println("Message has been sent");
     } catch (Exception e) {
       // TODO Auto-generated catch block
       e.printStackTrace();
-      System.out.println("Unable to send message. " + e.getMessage());
     }
   }
 
@@ -551,7 +551,7 @@ private byte[] decryptRSA(byte[] messageBytes)
    * @param message The message to be sent
    * @param image   The image to be sent
    */
-  public void sendMessage(String message, String image) {
+  public void sendMessage(String message, ImageData image) {
     sendMessageExecutor(message, image);
   }
 
@@ -564,12 +564,12 @@ private byte[] decryptRSA(byte[] messageBytes)
 
       if (keyName.equals("message-hash"))
         result.put("message-hash", lineSplit[1].trim());
-      else if (keyName.equals("certificate"))
-        result.put("certificate", lineSplit[1].trim());
       else if (keyName.equals("message"))
         result.put("message", lineSplit[1].trim());
       else if (keyName.equals("image"))
         result.put("image", lineSplit[1].trim());
+      else if (keyName.equals("image-dimensions"))
+        result.put("image-dimensions", lineSplit[1].trim());
     }
 
     return result;
@@ -590,12 +590,14 @@ private byte[] decryptRSA(byte[] messageBytes)
       if (verifyHash(messageWithoutHash, receivedHash)) {
         Map<String, String> parsedMessage = parseMessage(messageLines);
         if (parsedMessage.containsKey("message") && parsedMessage.containsKey("image")) {
-          System.out.println("Message: " + parsedMessage.get("message"));
-          gui.setData(parsedMessage.get("message"), parsedMessage.get("image"));
+          int imageWidth = Integer.parseInt(parsedMessage.get("image-dimensions").split(",")[0].trim());
+          int imageHeight = Integer.parseInt(parsedMessage.get("image-dimensions").split(",")[1].trim());
+          String encodedImage = parsedMessage.get("image");
+          ImageData image = new ImageData(imageHeight, imageWidth, encodedImage);
+          gui.setData(parsedMessage.get("message"), image);
         } else if (parsedMessage.containsKey("message")) {
-          gui.setCaption(parsedMessage.get("message"));
+          gui.setData(parsedMessage.get("message"), null);
         }
-        // gui.notify();
 
       }
 
@@ -604,35 +606,6 @@ private byte[] decryptRSA(byte[] messageBytes)
       e.printStackTrace();
       System.out.println("Unable to receive message. " + e.getMessage());
     }
-    // Process the incoming message here
-    // use session key to decrypt the message
-    // Remove hash from message
-    // compue hash on message without hash compare with hash
-    // decode the message
-    // display/print out the message
-    // System.out.println("Message Recieved: " + message);
-  }
-
-  /**
-   * This method is used to send an image to the other client.
-   *
-   * @param image The image to be sent
-   */
-  private String encodeImageToString(byte[] imageBytes) throws IOException {
-    return Base64.getEncoder().encodeToString(imageBytes);
-  }
-
-  /**
-   * This method is used to decode an image from a Base64 string.
-   *
-   * @param base64EncodedImage The Base64 string to be decoded
-   * @param outputPath         The path to save the decoded image
-   */
-  private void decodeImageFromString(String base64EncodedImage, String outputPath) throws IOException {
-    byte[] decodedBytes = Base64.getDecoder().decode(base64EncodedImage);
-    FileOutputStream imageOutputStream = new FileOutputStream(outputPath);
-    imageOutputStream.write(decodedBytes);
-    imageOutputStream.close();
   }
 
   /**

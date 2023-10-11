@@ -128,8 +128,8 @@ public class GUI {
 
     // Method to encode the image into a Base64 string
     private void encodeImage() {
-        if (imageBytes != null) {
-            String imageString = Base64.getEncoder().encodeToString(imageBytes);
+        if (imageData != null) {
+            String imageString = Base64.getEncoder().encodeToString(imageData.getBytes());
             client.sendMessage(captionArea.getText(), imageData);
 
             encodedImageArea.setText(imageString);

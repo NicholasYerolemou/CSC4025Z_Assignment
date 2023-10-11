@@ -261,29 +261,28 @@ public class Client {
 
       if (username.equalsIgnoreCase("Alice")) {
 
-          exchangeCertificates(outputStream, inputStream);
-          
-          // generate session key
-          KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
-          keyGenerator.init(128);
-          sessionKey = keyGenerator.generateKey();
+        exchangeCertificates(outputStream, inputStream);
 
-          byte [] encryptedMessage = sessionKey.getEncoded();
-          // encryptedMessage = encryptRSA(encryptedMessage);
+        // generate session key
+        KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
+        keyGenerator.init(128);
+        sessionKey = keyGenerator.generateKey();
 
-          String encodedMessage = Base64.getEncoder().encodeToString(encryptedMessage);
-          outputStream.println(encodedMessage); //send message
+        byte[] encryptedMessage = sessionKey.getEncoded();
+        // encryptedMessage = encryptRSA(encryptedMessage);
 
-        } 
-        else if (username.equalsIgnoreCase("Bob")) {
-          exchangeCertificates(outputStream, inputStream);
-          
-          //get session key from other client
-          String message = inputStream.readLine();
-          byte [] decodedMessage = Base64.getDecoder().decode(message);
+        String encodedMessage = Base64.getEncoder().encodeToString(encryptedMessage);
+        outputStream.println(encodedMessage); // send message
 
-          // decodedMessage = decryptRSA(decodedMessage);
-          sessionKey = new SecretKeySpec(decodedMessage, "AES");
+      } else if (username.equalsIgnoreCase("Bob")) {
+        exchangeCertificates(outputStream, inputStream);
+
+        // get session key from other client
+        String message = inputStream.readLine();
+        byte[] decodedMessage = Base64.getDecoder().decode(message);
+
+        // decodedMessage = decryptRSA(decodedMessage);
+        sessionKey = new SecretKeySpec(decodedMessage, "AES");
       }
 
       System.out.println("Session created.");
@@ -332,33 +331,30 @@ public class Client {
     System.out.println("Certificates exchanged and verified.");
   }
 
-private byte[] encryptRSA(byte[] messageBytes)
-{
+  private byte[] encryptRSA(byte[] messageBytes) {
 
-        try {
-           //encrypt with their public key
-             Cipher cipher = Cipher.getInstance("RSA");
-            cipher.init(Cipher.ENCRYPT_MODE, otherClientPublicKey);
-            byte[] sessionKey_otherPublicKey = cipher.doFinal(messageBytes);
+    try {
+      // encrypt with their public key
+      Cipher cipher = Cipher.getInstance("RSA");
+      cipher.init(Cipher.ENCRYPT_MODE, otherClientPublicKey);
+      byte[] sessionKey_otherPublicKey = cipher.doFinal(messageBytes);
 
-            // enrypt with our private key
-            cipher.init(Cipher.ENCRYPT_MODE, keyPair.getPrivate());
-            byte[] encryptedMessage = cipher.doFinal(sessionKey_otherPublicKey);
+      // enrypt with our private key
+      cipher.init(Cipher.ENCRYPT_MODE, keyPair.getPrivate());
+      byte[] encryptedMessage = cipher.doFinal(sessionKey_otherPublicKey);
 
-      
-            return encryptedMessage;
-        } 
-        catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | IllegalBlockSizeException | BadPaddingException e) {
-          e.printStackTrace();
-          return null;
-        }
-}
+      return encryptedMessage;
+    } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | IllegalBlockSizeException
+        | BadPaddingException e) {
+      e.printStackTrace();
+      return null;
+    }
+  }
 
-private byte[] decryptRSA(byte[] messageBytes)
-{
+  private byte[] decryptRSA(byte[] messageBytes) {
     // byte[] messageBytes = message.getBytes();
-    
-    //decrypt the message
+
+    // decrypt the message
     Cipher cipher;
 
     try {
@@ -367,11 +363,11 @@ private byte[] decryptRSA(byte[] messageBytes)
       byte[] halfDecryptedMessage = cipher.doFinal(messageBytes);
       cipher.init(Cipher.DECRYPT_MODE, otherClientPublicKey);
       byte[] decryptedMessage = cipher.doFinal(halfDecryptedMessage);
-    
+
       return decryptedMessage;
-    } 
-    catch (NoSuchAlgorithmException | NoSuchPaddingException  | IllegalBlockSizeException | BadPaddingException | InvalidKeyException e) {
-     
+    } catch (NoSuchAlgorithmException | NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException
+        | InvalidKeyException e) {
+
       e.printStackTrace();
       System.out.println("Error thrown in decrypt RSA");
       return null;
@@ -448,7 +444,7 @@ private byte[] decryptRSA(byte[] messageBytes)
       StringBuilder messageProtocol = new StringBuilder();
       messageProtocol.append("Message: ").append(message).append("\n");
       if (image != null) {
-        messageProtocol.append("Image: ").append(image).append("\n");
+        messageProtocol.append("Image: ").append(image.encodeImage()).append("\n");
         messageProtocol.append("Image-Dimensions: ").append(image.getWidth()).append(",").append(image.getHeight())
             .append("\n");
       }
@@ -659,7 +655,6 @@ private byte[] decryptRSA(byte[] messageBytes)
       return false;
     }
   }
-
 
   public static void main(String[] args) {
     Security.addProvider(new BouncyCastleProvider());

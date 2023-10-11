@@ -29,7 +29,7 @@ public class ImageData {
     public ImageData(int height, int width, String encodedImage) {
         this.height = height;
         this.width = width;
-        byte[] decodedImage = Base64.getDecoder().decode(encodedImage);
+        byte[] decodedImage = Base64.getDecoder().decode(encodedImage.getBytes());
         this.imageBytes = decodedImage;
     }
 

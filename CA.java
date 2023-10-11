@@ -12,9 +12,11 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Security;
+import java.security.SignatureException;
 import java.security.cert.X509Certificate;
 import java.security.spec.X509EncodedKeySpec;
 import java.sql.Time;
@@ -32,9 +34,11 @@ public class CA {
     private PublicKey publicKey;
     private PrivateKey privateKey;
     private Socket connectedClient = null;
+    private X509Certificate selfSignedCert;
 
     public CA() {
         generateKeys();
+        createSelfCert();
         listenForConnections();
     }
 
@@ -46,12 +50,41 @@ public class CA {
             keyPairGenerator.initialize(2048);
             KeyPair keyPair = keyPairGenerator.generateKeyPair();
             publicKey = keyPair.getPublic();
+            System.out.println(publicKey.toString());
             privateKey = keyPair.getPrivate();
         } catch (NoSuchAlgorithmException e) {
             System.out.println("Unable to create key pair generator.");
             e.printStackTrace();
         }
     }
+
+
+    private void createSelfCert() {
+        //create CA's self signed certificate
+        
+        try {
+            X509V1CertificateGenerator certGen = new X509V1CertificateGenerator();
+            
+            // Set certificate attributes
+            certGen.setSerialNumber(BigInteger.valueOf(System.currentTimeMillis()));
+            certGen.setIssuerDN(new X500Principal("CN=CA"));
+            certGen.setNotBefore(new Date(System.currentTimeMillis()));
+            certGen.setNotAfter(new Date(System.currentTimeMillis() + 365 * 24 * 60 * 60 * 1000L)); // 1 year validity
+            certGen.setSubjectDN(new X500Principal("CN=CA"));
+            certGen.setPublicKey(publicKey);
+            certGen.setSignatureAlgorithm("SHA256WithRSAEncryption");
+
+            // Create a self-signed certificate
+            selfSignedCert = certGen.generate(privateKey, "BC");
+            System.out.println("Created self-signed certificate");
+
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+
 
     private void listenForConnections() {
         int PORT = 12346;
@@ -106,12 +139,17 @@ public class CA {
             outputStream = new PrintWriter(connectedClient.getOutputStream(), true);
             inputStream = new BufferedReader(new InputStreamReader(connectedClient.getInputStream()));
 
-            // send the CA's public key to the client
-            String pubKeyString = Base64.getEncoder().encodeToString(publicKey.getEncoded());
-            String messageHash = calculateHash(pubKeyString);
-            String message = pubKeyString + "," + messageHash;
-            outputStream.println(message);
-
+            try {
+            byte[] selfCertBytes = selfSignedCert.getEncoded();
+            String selfCertString = Base64.getEncoder().encodeToString(selfCertBytes);
+            outputStream.println(selfCertString);
+            }
+            catch(Exception e)
+            {
+                e.printStackTrace(outputStream);
+            }
+           
+            //get the CSR rom the client
             String csrString = inputStream.readLine();
             byte[] csrBytes = Base64.getDecoder().decode(csrString);
             PKCS10CertificationRequest csr = new PKCS10CertificationRequest(csrBytes);
@@ -132,7 +170,7 @@ public class CA {
                 e.printStackTrace();
             }
 
-        } catch (IOException | NoSuchAlgorithmException e) {
+        } catch (IOException e) {
 
             e.printStackTrace();
         }
@@ -165,31 +203,31 @@ public class CA {
     //   return Null;
     //}
 
-    private void sendMessage(String message, PrintWriter out) {
-        out.println(message); // Send a message to the client
-        try {
-            connectedClient.close();
-        } catch (IOException e) {
-            System.out.println("Could not close connection with client.");
-            e.printStackTrace();
-        } // Close the connection after sending the response
-    }
+    // private void sendMessage(String message, PrintWriter out) {
+    //     out.println(message); // Send a message to the client
+    //     try {
+    //         connectedClient.close();
+    //     } catch (IOException e) {
+    //         System.out.println("Could not close connection with client.");
+    //         e.printStackTrace();
+    //     } // Close the connection after sending the response
+    // }
 
-    private String calculateHash(String message) throws NoSuchAlgorithmException {
-        MessageDigest md = MessageDigest.getInstance("SHA-256");
-        byte[] hashBytes = md.digest(message.getBytes());
+    // private String calculateHash(String message) throws NoSuchAlgorithmException {
+    //     MessageDigest md = MessageDigest.getInstance("SHA-256");
+    //     byte[] hashBytes = md.digest(message.getBytes());
 
-        // Convert the byte array to a hexadecimal representation
-        StringBuilder hexString = new StringBuilder();
-        for (byte hashByte : hashBytes) {
-            String hex = Integer.toHexString(0xff & hashByte);
-            if (hex.length() == 1) {
-                hexString.append('0');
-            }
-            hexString.append(hex);
-        }
-        return hexString.toString();
-    }
+    //     // Convert the byte array to a hexadecimal representation
+    //     StringBuilder hexString = new StringBuilder();
+    //     for (byte hashByte : hashBytes) {
+    //         String hex = Integer.toHexString(0xff & hashByte);
+    //         if (hex.length() == 1) {
+    //             hexString.append('0');
+    //         }
+    //         hexString.append(hex);
+    //     }
+    //     return hexString.toString();
+    // }
 
     public static void main(String[] args) {
         Security.addProvider(new BouncyCastleProvider());

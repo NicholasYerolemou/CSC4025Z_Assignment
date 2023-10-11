@@ -24,6 +24,7 @@ import java.security.PublicKey;
 import java.security.Security;
 import java.security.Signature;
 import java.security.SignatureException;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -36,7 +37,6 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import javax.security.auth.x500.X500Principal;
-
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.jce.PKCS10CertificationRequest;
 import org.bouncycastle.x509.X509V1CertificateGenerator;
@@ -60,6 +60,8 @@ public class Client {
   SecretKey sessionKey;
   private GUI gui;
   private PublicKey CA_PublicKey;
+  private PublicKey otherClientPublicKey;
+  X509Certificate certificate;
   private KeyPair keyPair;
   private static boolean connected = false;
   private Socket targetSocket = null;// the socket if the client you are connected to
@@ -128,9 +130,8 @@ public class Client {
         X509Certificate CA_certificate = (X509Certificate) certificateFactory
               .generateCertificate(new ByteArrayInputStream(CACertBytes));
               CA_certificate.checkValidity();
-              System.out.println("CA's certificate verified");
+              System.out.println("CA's certificate verified, extracting public key");
               CA_PublicKey = CA_certificate.getPublicKey();
-              System.out.println(CA_PublicKey.toString());
         }
         catch (CertificateException e)
         {
@@ -146,9 +147,6 @@ public class Client {
         byte[] csrBytes = csr.getEncoded();
         String csrString = Base64.getEncoder().encodeToString(csrBytes);
 
-        // Sign CSR with private key
-        csrString = signWithPrivateKey(csrString); // the signWithPrivateKey method still needs to be implemented
-
         // Send CSR to CA
         outputStream.println(csrString);
 
@@ -160,7 +158,7 @@ public class Client {
           // Convert the certificate from String to X509Certificate
           byte[] certificateBytes = Base64.getDecoder().decode(certificateString);
          CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
-          X509Certificate certificate = (X509Certificate) certificateFactory
+          certificate = (X509Certificate) certificateFactory
               .generateCertificate(new ByteArrayInputStream(certificateBytes));
         } catch (Exception e) {
           e.printStackTrace();
@@ -266,6 +264,7 @@ public class Client {
     String response;                        
     try {
 
+     
       outputStream = new PrintWriter(targetSocket.getOutputStream(), true);
       outputStream.println("Your certificate goes here");// send your certificate here
       inputStream = new BufferedReader(new InputStreamReader(targetSocket.getInputStream()));// get response from
@@ -275,8 +274,25 @@ public class Client {
       verified = true;
       // The response should contain their certificate
 
-      if (verified) {
+      
         if (username.equalsIgnoreCase("Alice")) {
+
+          //send this clients certificate certificate 
+          byte[] certificateBytes = certificate.getEncoded();
+          String certificateString = Base64.getEncoder().encodeToString(certificateBytes);
+          outputStream.println(certificateString); 
+
+          //get other clients certificate and extract public key
+          String otherCertString = inputStream.readLine();
+          byte[] otherCertBytes = Base64.getDecoder().decode(otherCertString);
+          CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+          X509Certificate other_Client_certificate = (X509Certificate) certificateFactory
+              .generateCertificate(new ByteArrayInputStream(otherCertBytes));
+              other_Client_certificate.checkValidity();
+              System.out.println("Other clients certificate verified, extracting public key");
+              otherClientPublicKey = other_Client_certificate.getPublicKey();
+              
+      
 
           // generate session key
           KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
@@ -305,9 +321,27 @@ public class Client {
           outputStream.println(message);
 
         } else if (username.equalsIgnoreCase("Bob")) {
-          // Simulate receiving the session key and its hash from Alice
 
-          System.out.println("Waiting for session key.");
+
+          //get other clients certificate and extract public key
+          String otherCertString = inputStream.readLine();
+          byte[] otherCertBytes = Base64.getDecoder().decode(otherCertString);
+          CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+          X509Certificate other_Client_certificate = (X509Certificate) certificateFactory
+              .generateCertificate(new ByteArrayInputStream(otherCertBytes));
+              other_Client_certificate.checkValidity();
+              System.out.println("Other clients certificate verified, extracting public key");
+              otherClientPublicKey = other_Client_certificate.getPublicKey();
+
+
+          //send this clients certificate certificate 
+          byte[] certificateBytes = certificate.getEncoded();
+          String certificateString = Base64.getEncoder().encodeToString(certificateBytes);
+          outputStream.println(certificateString); 
+
+          
+
+          //get session key from other client
           String message = inputStream.readLine();
           String[] data = message.split(",");
           String sessionKeyString = data[0];
@@ -331,7 +365,7 @@ public class Client {
             // resend message requesting session key
           }
 
-        }
+        
 
         // encode session key with our private key
         // ecnode session key with their public key
@@ -341,7 +375,7 @@ public class Client {
 
       System.out.println("Session created.");
 
-    } catch (IOException | NoSuchAlgorithmException e) {
+    } catch (IOException | NoSuchAlgorithmException  | CertificateException e) {
       System.out.println("Failed to create writer to client" + e.getMessage());
     }
   }
@@ -647,10 +681,7 @@ public class Client {
       return false;
   }
 
-  private String signWithPrivateKey(String message) {
-    return message;
 
-  }
 
   public static void main(String[] args) {
     Security.addProvider(new BouncyCastleProvider());

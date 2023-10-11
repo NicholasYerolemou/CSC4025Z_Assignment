@@ -50,7 +50,6 @@ public class CA {
             keyPairGenerator.initialize(2048);
             KeyPair keyPair = keyPairGenerator.generateKeyPair();
             publicKey = keyPair.getPublic();
-            System.out.println(publicKey.toString());
             privateKey = keyPair.getPrivate();
         } catch (NoSuchAlgorithmException e) {
             System.out.println("Unable to create key pair generator.");
@@ -153,6 +152,7 @@ public class CA {
             String csrString = inputStream.readLine();
             byte[] csrBytes = Base64.getDecoder().decode(csrString);
             PKCS10CertificationRequest csr = new PKCS10CertificationRequest(csrBytes);
+            
             
             try {
                 Boolean valid = csr.verify();

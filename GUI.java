@@ -14,46 +14,62 @@ public class GUI {
     Client client;
     // Declare GUI components
     private JFrame frame;
-    private JTextField filePathField;
     private JTextArea captionArea;
-    private JTextArea encodedImageArea;
+    private JTextArea receivedMessagesArea = new JTextArea(10, 30);
+    private JLabel imagePreviewLabel; // Added for image preview
     private byte[] imageBytes; // To store the image data as bytes
+    private JButton sendButton; // Added for sending the image
 
     public GUI(Client client) {
         this.client = client;
+        //Set the system's native look and feel
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         // Initialize the main frame
-        frame = new JFrame("Image Caption Application");
-        frame.setSize(500, 500);
+        frame = new JFrame("Message Application");
+        frame.setSize(600, 600);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setLayout(new FlowLayout());
+        frame.setLayout(new BorderLayout());
+        frame.add(new JScrollPane(receivedMessagesArea));
 
-        // Button to select an image
+        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        //Image preview label
+        imagePreviewLabel = new JLabel("", SwingConstants.CENTER);
+        imagePreviewLabel.setBorder(BorderFactory.createTitledBorder("Image Preview"));
+        frame.add(imagePreviewLabel, BorderLayout.CENTER);
+
+        //Bottom panel for select image, caption, and send
+        JPanel bottomPanel = new JPanel(new BorderLayout());
+
+         // Button to select an image
         JButton selectImageButton = new JButton("Select Image");
-        frame.add(selectImageButton);
-
-        // Text field to display the file path of the selected image
-        filePathField = new JTextField(30);
-        filePathField.setEditable(false);
-        frame.add(filePathField);
+        selectImageButton.setPreferredSize(new Dimension(100, 10));
+        bottomPanel.add(selectImageButton, BorderLayout.WEST);
 
         // Text area for user to input a caption or message
-        captionArea = new JTextArea(5, 30);
+        captionArea = new JTextArea(2, 10);
         captionArea.setWrapStyleWord(true);
         captionArea.setLineWrap(true);
+        captionArea.setBorder(BorderFactory.createTitledBorder("Send a message"));
+        captionArea.setFont (new Font("Arial", Font.PLAIN, 14));
         JScrollPane captionScrollPane = new JScrollPane(captionArea);
-        frame.add(captionScrollPane);
+        bottomPanel.add(captionScrollPane, BorderLayout.CENTER);
 
-        // Button to encode the image
-        JButton encodeButton = new JButton("Encode Image");
-        frame.add(encodeButton);
+        //Button to send the image and the caption
+        JButton sendButton = new JButton("Send");
+        sendButton.setPreferredSize(new Dimension(80, 10));
+        bottomPanel.add(sendButton, BorderLayout.EAST);
+        frame.add(bottomPanel, BorderLayout.SOUTH);
 
-        // Text area to display the encoded image string
-        encodedImageArea = new JTextArea(10, 30);
-        encodedImageArea.setWrapStyleWord(true);
-        encodedImageArea.setLineWrap(true);
-        encodedImageArea.setEditable(false);
-        JScrollPane encodedScrollPane = new JScrollPane(encodedImageArea);
-        frame.add(encodedScrollPane);
+        //Color Scheme
+        frame.getContentPane().setBackground(new Color(240, 248, 255));
+        topPanel.setBackground(new Color(240,248,255));
 
         // Action listener for the "Select Image" button
         selectImageButton.addActionListener(new ActionListener() {
@@ -63,11 +79,11 @@ public class GUI {
             }
         });
 
-        // Action listener for the "Encode Image" button
-        encodeButton.addActionListener(new ActionListener() {
+        //Action listener for the "Send" button
+        sendButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                encodeImage();
+                sendImageAndCaption();
             }
         });
 
@@ -82,29 +98,62 @@ public class GUI {
         if (returnValue == JFileChooser.APPROVE_OPTION) {
             try {
                 File selectedFile = fileChooser.getSelectedFile();
-                filePathField.setText(selectedFile.getAbsolutePath());
 
                 // Read the selected image into a BufferedImage and store it as bytes
                 BufferedImage image = ImageIO.read(selectedFile);
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 ImageIO.write(image, "jpg", baos);
                 imageBytes = baos.toByteArray();
+
+                //Define maximum dimensions for the image preview
+                int maxWidth = 200;
+                int maxHeight =200;
+                ImageIcon imageIcon = new ImageIcon(image);
+                Image scaledImage = imageIcon.getImage().getScaledInstance(maxWidth, -1, Image.SCALE_SMOOTH);
+
+                if (scaledImage.getHeight(null) > maxHeight) {
+                    scaledImage = imageIcon.getImage().getScaledInstance(-1, maxHeight, Image.SCALE_SMOOTH);
+                }
+
+                //Calculate the aspect ratio of the image
+                double aspectRatio = (double) image.getWidth() / image.getHeight();
+
+                //Calculate new dimensions based on the aspect ratio
+                int newWidth = maxWidth;
+                int newHeight = (int) (newWidth / aspectRatio);
+
+                if (newHeight > maxHeight) {
+                    newHeight = maxHeight;
+                    newWidth = (int) (newHeight * aspectRatio);
+                }
+                imagePreviewLabel.setIcon(new ImageIcon(scaledImage));
+
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
         }
     }
 
-    // Method to encode the image into a Base64 string
-    private void encodeImage() {
+    //Method to send the image and caption
+    private void sendImageAndCaption() {
         if (imageBytes != null) {
             String imageString = Base64.getEncoder().encodeToString(imageBytes);
-            client.sendMessage(imageString);
+            String caption = captionArea.getText();
 
-            encodedImageArea.setText(imageString);
+            String structuredMessage = "From:" + client.getName() + caption + "\n" + imageString;
+            client.sendMessage(structuredMessage);
+
+            //client.sendMessage(imageString);
+
+            //JOptionPane.showMessageDialog(frame, "Image and caption sent successfully");
         } else {
             JOptionPane.showMessageDialog(frame, "Please select an image first!");
         }
+    }
+
+    //Method to update the received messages area
+    public void displayReceivedMessage(String sender, String message) {
+        receivedMessagesArea.append(sender + ": " + message + "\n");
     }
 
     // Main method to run the GUI application

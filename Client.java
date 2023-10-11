@@ -61,7 +61,6 @@ public class Client {
   private PublicKey CA_PublicKey;
   private PublicKey otherClientPublicKey;
   X509Certificate certificate;
-  PublicKey sendingClientPublicKey;
 
   private KeyPair keyPair;
   private static boolean connected = false;
@@ -678,7 +677,7 @@ public class Client {
       byte[] ditigalSignature = Base64.getDecoder().decode(recievedHash);
       Signature signature = Signature.getInstance("SHA256withRSA");
       // To verify the signature using the public key
-      signature.initVerify(sendingClientPublicKey);
+      signature.initVerify(otherClientPublicKey);
       signature.update(hash);
       return signature.verify(ditigalSignature);
     } catch (Exception e) {

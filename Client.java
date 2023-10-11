@@ -24,6 +24,8 @@ import java.security.PublicKey;
 import java.security.Security;
 import java.security.Signature;
 import java.security.SignatureException;
+import java.security.cert.CertificateEncodingException;
+import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
@@ -35,7 +37,6 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import javax.security.auth.x500.X500Principal;
-
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.jce.PKCS10CertificationRequest;
 import org.bouncycastle.x509.X509V1CertificateGenerator;
@@ -50,12 +51,16 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.BadPaddingException;
 import java.security.SecureRandom;
 import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.IvParameterSpec;
 
 public class Client {
 
   static Client client;
   SecretKey sessionKey;
   private GUI gui;
+  private PublicKey CA_PublicKey;
+  private PublicKey otherClientPublicKey;
+  X509Certificate certificate;
   PublicKey sendingClientPublicKey;
 
   private KeyPair keyPair;
@@ -113,51 +118,45 @@ public class Client {
         // request certificate
         outputStream.println("0");
 
-        // get CAs public key
-        String recievedMessage = inputStream.readLine();
-        String[] data = recievedMessage.split(",");
-        String CA_publicKeyString = data[0];
-        String messageHash = data[1];
-
-        if (verifyHash(CA_publicKeyString, messageHash)) {
-
-          byte[] CA_publicKeyBytes = Base64.getDecoder().decode(CA_publicKeyString);
-          KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-          X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(CA_publicKeyBytes);
-          PublicKey CA_PublicKey = keyFactory.generatePublic(publicKeySpec);
-
-          // Generate CSR
-          PKCS10CertificationRequest csr = generateCSR(keyPair, username);
-
-          // Convert CSR to String
-          byte[] csrBytes = csr.getEncoded();
-          String csrString = Base64.getEncoder().encodeToString(csrBytes);
-
-          // Sign CSR with private key
-          csrString = signWithPrivateKey(csrString); // the signWithPrivateKey method still needs to be implemented
-
-          // Send CSR to CA
-          outputStream.println(csrString);
-
-          // Receive certificate from CA
-          String certificateString = inputStream.readLine();
-          System.out.println("Received certificate.");
-
-          try {
-            // Convert the certificate from String to X509Certificate
-            byte[] certificateBytes = Base64.getDecoder().decode(certificateString);
-            CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
-            X509Certificate certificate = (X509Certificate) certificateFactory
-                .generateCertificate(new ByteArrayInputStream(certificateBytes));
-          } catch (Exception e) {
-            e.printStackTrace();
-          }
-
-        } else {
-          System.out.println("The hash recieved did not match the CAs public key.");
+        try {
+          // get CAs certificate and extract public key
+          String CACertString = inputStream.readLine();
+          byte[] CACertBytes = Base64.getDecoder().decode(CACertString);
+          CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+          X509Certificate CA_certificate = (X509Certificate) certificateFactory
+              .generateCertificate(new ByteArrayInputStream(CACertBytes));
+          CA_certificate.checkValidity();
+          System.out.println("CA's certificate verified, extracting public key");
+          CA_PublicKey = CA_certificate.getPublicKey();
+        } catch (CertificateException e) {
+          e.printStackTrace(outputStream);
         }
 
-      } catch (IOException | NoSuchAlgorithmException | InvalidKeySpecException e) {
+        // Generate CSR
+        PKCS10CertificationRequest csr = generateCSR(keyPair, username);
+
+        // Convert CSR to String
+        byte[] csrBytes = csr.getEncoded();
+        String csrString = Base64.getEncoder().encodeToString(csrBytes);
+
+        // Send CSR to CA
+        outputStream.println(csrString);
+
+        // Receive certificate from CA
+        String certificateString = inputStream.readLine();
+        System.out.println("Received certificate.");
+
+        try {
+          // Convert the certificate from String to X509Certificate
+          byte[] certificateBytes = Base64.getDecoder().decode(certificateString);
+          CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+          certificate = (X509Certificate) certificateFactory
+              .generateCertificate(new ByteArrayInputStream(certificateBytes));
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+
+      } catch (IOException e) {
 
         e.printStackTrace();
       }
@@ -258,73 +257,154 @@ public class Client {
     try {
 
       outputStream = new PrintWriter(targetSocket.getOutputStream(), true);
-      outputStream.println("Your certificate goes here");// send your certificate here
       inputStream = new BufferedReader(new InputStreamReader(targetSocket.getInputStream()));// get response from
                                                                                              // client
-      response = inputStream.readLine();
-      boolean verified = verifyCertificate(response);
-      verified = true;
-      // The response should contain their certificate
 
-      if (verified) {
-        if (username.equalsIgnoreCase("Alice")) {
+      if (username.equalsIgnoreCase("Alice")) {
 
-          // generate session key
-          KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
-          keyGenerator.init(128);
-          sessionKey = keyGenerator.generateKey();
+        exchangeCertificates(outputStream, inputStream);
 
-          // convert to string
-          String sessionKeyString = Base64.getEncoder().encodeToString(sessionKey.getEncoded());
-          String sessionKeyhashString = calculateHash(sessionKeyString);
-          // IvParameterSpec generatedIv = new IvParameterSpec(ivBytes);
-          SecureRandom random = new SecureRandom();
-          byte[] generatedIv = new byte[16];
-          random.nextBytes(generatedIv);
-          String ivString = Base64.getEncoder().encodeToString(generatedIv);
-          String ivStringHash = calculateHash(ivString);
-          byte[] tagbytes = new byte[16];
-          random.nextBytes(tagbytes);
-          // authTag = tagbytes;
-          String tagBytesString = Base64.getEncoder().encodeToString(tagbytes);
-          String tagBytesStringHash = calculateHash(tagBytesString);
+        // generate session key
+        KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
+        keyGenerator.init(128);
+        sessionKey = keyGenerator.generateKey();
 
-          // send message
-          String message = sessionKeyString + "," + sessionKeyhashString + "," + ivString + "," + ivStringHash + ","
-              + tagBytesString + "," + tagBytesStringHash;
-          outputStream.println(message);
+        // get hash of session key
+        // String sessionKeyString =
+        // Base64.getEncoder().encodeToString(sessionKey.getEncoded());
+        String sessionKeyString = sessionKey.toString();
+        String messageHash = calculateHash(sessionKeyString);
 
-        } else if (username.equalsIgnoreCase("Bob")) {
-          // Simulate receiving the session key and its hash from Alice
+        // create message with session key and hash
+        String message = messageHash + "," + sessionKeyString;
+        String encryptedMessage = encryptRSA(sessionKeyString);
+        outputStream.println(encryptedMessage); // send message
 
-          System.out.println("Waiting for session key.");
-          String message = inputStream.readLine();
-          String[] data = message.split(",");
-          String sessionKeyString = data[0];
-          String sessionKeyHash = data[1];
+      } else if (username.equalsIgnoreCase("Bob")) {
+        exchangeCertificates(outputStream, inputStream);
 
-          if (verifyHash(sessionKeyString, sessionKeyHash)) {
-            byte[] receivedSessionKeyBytes = Base64.getDecoder().decode(sessionKeyString);
-            sessionKey = new SecretKeySpec(receivedSessionKeyBytes, "AES");
-          } else {
-            System.out.println("Session key recieved does not match message hash.");
-            // resend message requesting session key
-          }
+        // get session key from other client
+        String message = inputStream.readLine();
+        String messageString = decryptRSA(message);
+        System.out.println("Message is:" + messageString);
 
+        String[] data = messageString.split(",");
+        String sessionKeyString = data[1];
+        String sessionKeyHash = data[0];
+        System.out.println("Session key has been retrieved");
+
+        if (verifyHash(sessionKeyString, sessionKeyHash)) {
+
+          byte[] receivedSessionKeyBytes = Base64.getDecoder().decode(sessionKeyString);
+          sessionKey = new SecretKeySpec(receivedSessionKeyBytes, "AES");
+          System.out.println("Session key has been verified");
+
+        } else {
+          System.out.println("Session key recieved does not match message hash.");
+          // resend message requesting session key
         }
+
       }
 
       System.out.println("Session created.");
 
     } catch (Exception e) {
-      System.out.println("Failed to create writer to client" + e.getMessage());
+      System.out.println("Error in create session catch");
+      e.printStackTrace(outputStream);
     }
   }
 
-  private boolean verifyCertificate(String recievedCertificate) {
-    return true;// return true if the certificate is verified, false otherwise
-    // store their public key on our system
-    // To verify - check if it can be decrypted by the CA's public key
+  private void exchangeCertificates(PrintWriter outputStream, BufferedReader inputStream)
+      throws IOException, CertificateException {
+    if (username.equalsIgnoreCase("Alice")) {
+      // send this clients certificate certificate
+      byte[] certificateBytes = certificate.getEncoded();
+      String certificateString = Base64.getEncoder().encodeToString(certificateBytes);
+      outputStream.println(certificateString);
+
+      // get other clients certificate and extract public key
+      String otherCertString = inputStream.readLine();
+      byte[] otherCertBytes = Base64.getDecoder().decode(otherCertString);
+      CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+      X509Certificate other_Client_certificate = (X509Certificate) certificateFactory
+          .generateCertificate(new ByteArrayInputStream(otherCertBytes));
+      other_Client_certificate.checkValidity();
+
+      otherClientPublicKey = other_Client_certificate.getPublicKey();
+    } else if (username.equalsIgnoreCase("Bob")) {
+      // get other clients certificate and extract public key
+      String otherCertString = inputStream.readLine();
+      byte[] otherCertBytes = Base64.getDecoder().decode(otherCertString);
+      CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+      X509Certificate other_Client_certificate = (X509Certificate) certificateFactory
+          .generateCertificate(new ByteArrayInputStream(otherCertBytes));
+      other_Client_certificate.checkValidity();
+
+      otherClientPublicKey = other_Client_certificate.getPublicKey();
+
+      // send this clients certificate certificate
+      byte[] certificateBytes = certificate.getEncoded();
+      String certificateString = Base64.getEncoder().encodeToString(certificateBytes);
+      outputStream.println(certificateString);
+
+    }
+
+    System.out.println("Certificates exchanged and verified.");
+  }
+
+  private String encryptRSA(String message) {
+    byte[] messageBytes = message.getBytes();
+
+    // encrypt with their public key
+    Cipher cipher;
+    try {
+      cipher = Cipher.getInstance("RSA");
+      cipher.init(Cipher.ENCRYPT_MODE, otherClientPublicKey);
+      byte[] sessionKey_otherPublicKey = cipher.doFinal(messageBytes);
+
+      // //enrypt with our private key
+      // Cipher cipherTwo = Cipher.getInstance("RSA");
+      // cipherTwo.init(Cipher.ENCRYPT_MODE, keyPair.getPrivate());
+      // byte[] sessionKey_otherPublicKey_privateKey =
+      // cipherTwo.doFinal(sessionKey_otherPublicKey);
+      // String encryptedMessage =
+      // Base64.getEncoder().encodeToString(sessionKey_otherPublicKey_privateKey);
+
+      String encryptedMessage = Base64.getEncoder().encodeToString(sessionKey_otherPublicKey);
+      return encryptedMessage;
+    } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | IllegalBlockSizeException
+        | BadPaddingException e) {
+      e.printStackTrace();
+      return null;
+    }
+  }
+
+  private String decryptRSA(String message) {
+    byte[] messageBytes = message.getBytes();
+
+    // decrypt the message
+    Cipher cipher;
+
+    try {
+      cipher = Cipher.getInstance("RSA");
+
+      byte[] decryptedMessage = cipher.doFinal(messageBytes);
+      cipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate());
+      String decryptedMessageString = new String(decryptedMessage);
+
+      // cipher.init(Cipher.DECRYPT_MODE, otherClientPublicKey);
+      // byte[] decryptedMessage_privateKey = cipher.doFinal(messageBytes);
+      // cipher.init(Cipher.DECRYPT_MODE, keyPair.getPublic());
+
+      return decryptedMessageString;
+    } catch (NoSuchAlgorithmException | NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException
+        | InvalidKeyException e) {
+
+      e.printStackTrace();
+      System.out.println("Error thrown in decrypt RSA");
+      return null;
+    }
+
   }
 
   private void listenForUserInput() {
@@ -606,11 +686,6 @@ public class Client {
       e.printStackTrace();
       return false;
     }
-  }
-
-  private String signWithPrivateKey(String message) {
-    return message;
-
   }
 
   public static void main(String[] args) {

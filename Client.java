@@ -278,17 +278,12 @@ public class Client {
           KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
           keyGenerator.init(128);
           sessionKey = keyGenerator.generateKey();
-        
 
-          //get hash of session key
-          // String sessionKeyString = Base64.getEncoder().encodeToString(sessionKey.getEncoded());
-          String sessionKeyString = sessionKey.toString();
-          String messageHash = calculateHash(sessionKeyString);
+          byte [] encryptedMessage = sessionKey.getEncoded();
+          // encryptedMessage = encryptRSA(encryptedMessage);
 
-          //create message with session key and hash
-          String message = messageHash+","+sessionKeyString;
-          String encryptedMessage = encryptRSA(sessionKeyString);
-          outputStream.println(encryptedMessage); //send message
+          String encodedMessage = Base64.getEncoder().encodeToString(encryptedMessage);
+          outputStream.println(encodedMessage); //send message
 
         } 
         else if (username.equalsIgnoreCase("Bob")) {
@@ -296,25 +291,10 @@ public class Client {
           
           //get session key from other client
           String message = inputStream.readLine();
-          String messageString = decryptRSA(message);
-          System.out.println("Message is:"+ messageString);
+          byte [] decodedMessage = Base64.getDecoder().decode(message);
 
-          String[] data = messageString.split(",");
-          String sessionKeyString = data[1];
-          String sessionKeyHash = data[0];
-          System.out.println("Session key has been retrieved");
-
-          if (verifyHash(sessionKeyString, sessionKeyHash)) {
-            
-            byte[] receivedSessionKeyBytes = Base64.getDecoder().decode(sessionKeyString);
-            sessionKey = new SecretKeySpec(receivedSessionKeyBytes, "AES");
-            System.out.println("Session key has been verified");
-
-          } else {
-            System.out.println("Session key recieved does not match message hash.");
-            // resend message requesting session key
-          }
-
+          // decodedMessage = decryptRSA(decodedMessage);
+          sessionKey = new SecretKeySpec(decodedMessage, "AES");
       }
 
       System.out.println("Session created.");
@@ -368,26 +348,20 @@ private void exchangeCertificates(PrintWriter outputStream, BufferedReader input
   System.out.println("Certificates exchanged and verified.");
 }
 
-private String encryptRSA(String message)
+private byte[] encryptRSA(byte[] messageBytes)
 {
-        byte [] messageBytes = message.getBytes();
-        
-        
-        //encrypt with their public key
-        Cipher cipher;
+
         try {
-            cipher = Cipher.getInstance("RSA");
+           //encrypt with their public key
+             Cipher cipher = Cipher.getInstance("RSA");
             cipher.init(Cipher.ENCRYPT_MODE, otherClientPublicKey);
             byte[] sessionKey_otherPublicKey = cipher.doFinal(messageBytes);
 
-            // //enrypt with our private key
-            // Cipher cipherTwo = Cipher.getInstance("RSA");
-            // cipherTwo.init(Cipher.ENCRYPT_MODE, keyPair.getPrivate());
-            // byte[] sessionKey_otherPublicKey_privateKey = cipherTwo.doFinal(sessionKey_otherPublicKey);
-            // String encryptedMessage = Base64.getEncoder().encodeToString(sessionKey_otherPublicKey_privateKey);
+            // enrypt with our private key
+            cipher.init(Cipher.ENCRYPT_MODE, keyPair.getPrivate());
+            byte[] encryptedMessage = cipher.doFinal(sessionKey_otherPublicKey);
 
-
-            String encryptedMessage = Base64.getEncoder().encodeToString(sessionKey_otherPublicKey);
+      
             return encryptedMessage;
         } 
         catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | IllegalBlockSizeException | BadPaddingException e) {
@@ -396,27 +370,21 @@ private String encryptRSA(String message)
         }
 }
 
-private String decryptRSA(String message)
+private byte[] decryptRSA(byte[] messageBytes)
 {
-    byte[] messageBytes = message.getBytes();
+    // byte[] messageBytes = message.getBytes();
     
     //decrypt the message
     Cipher cipher;
  
     try {
       cipher = Cipher.getInstance("RSA");
-      
-      byte[] decryptedMessage = cipher.doFinal(messageBytes);
       cipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate());
-      String decryptedMessageString = new String(decryptedMessage);
-      
-
-      // cipher.init(Cipher.DECRYPT_MODE, otherClientPublicKey);
-      // byte[] decryptedMessage_privateKey = cipher.doFinal(messageBytes);
-      // cipher.init(Cipher.DECRYPT_MODE, keyPair.getPublic());
-      
-
-      return decryptedMessageString;
+      byte[] halfDecryptedMessage = cipher.doFinal(messageBytes);
+      cipher.init(Cipher.DECRYPT_MODE, otherClientPublicKey);
+      byte[] decryptedMessage = cipher.doFinal(halfDecryptedMessage);
+    
+      return decryptedMessage;
     } 
     catch (NoSuchAlgorithmException | NoSuchPaddingException  | IllegalBlockSizeException | BadPaddingException | InvalidKeyException e) {
      
@@ -432,26 +400,8 @@ private String decryptRSA(String message)
 
     Thread userListenerThread = new Thread(() -> {
       System.out.println("Listening for user input.");
-      System.out.println(this);
       gui = new GUI(this);
 
-      // Create output stream
-      // PrintWriter out = null;
-
-      // try {
-
-      // out = new PrintWriter(targetSocket.getOutputStream(), true);
-      // } catch (IOException e) {
-      // System.out.println("Failed to create writer to client" + e.getMessage());
-      // }
-
-      // while (connected) {
-      // // listen for user input
-      // Scanner scanner = new Scanner(System.in);
-      // String userInput = scanner.nextLine();
-      // sendMessage(userInput, out);
-
-      // }
     });
     userListenerThread.start();
 
@@ -736,7 +686,6 @@ private String decryptRSA(String message)
       return false;
     }
   }
-
 
 
   public static void main(String[] args) {

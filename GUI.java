@@ -141,13 +141,14 @@ public class GUI {
         receivedMessagesArea.append(sender + ": " + message + "\n");
     }
 
+    public void close()
+    {
+        frame.setVisible(false);
+        frame.dispose();
+    }
+
     // Main method to run the GUI application
     public static void main(String[] args) {
-        // SwingUtilities.invokeLater(new Runnable() {
-        // @Override
-        // public void run() {
-        // new GUI();
-        // }
-        // });
     }
+
 }

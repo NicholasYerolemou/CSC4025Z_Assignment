@@ -61,6 +61,7 @@ public class Client {
   private PublicKey CA_PublicKey;
   private PublicKey otherClientPublicKey;
   X509Certificate certificate;
+  Thread userListenerThread;
 
   private KeyPair keyPair;
   private static boolean connected = false;
@@ -149,9 +150,10 @@ public class Client {
         String certificateString = inputStream.readLine();
         System.out.println("Received certificate.");
 
-        try {
+        try { //if the CSR failed they return "Invalid CSR", check for that and reattempt certificate 
           // Convert the certificate from String to X509Certificate
           byte[] certificateBytes = Base64.getDecoder().decode(certificateString);
+
           CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
           certificate = (X509Certificate) certificateFactory
               .generateCertificate(new ByteArrayInputStream(certificateBytes));
@@ -386,7 +388,7 @@ public class Client {
   private void listenForUserInput() {
     // Create another thread to listen for user input to trigger sending a message.
 
-    Thread userListenerThread = new Thread(() -> {
+    userListenerThread = new Thread(() -> {
       System.out.println("Listening for user input.");
       gui = new GUI(this);
 
@@ -399,7 +401,6 @@ public class Client {
     System.out.println("Listening for incoming messages.");
 
     // listen for a recieved input to trigger processing a message.
-
     // Create input and output streams
     BufferedReader in = null;
 
@@ -419,13 +420,14 @@ public class Client {
         if (receivedMessage == null) {
           // the other client has disconnected
           connected = false;
-          System.out.println("Connected set to: " + connected);
-        } else {
+          System.out.println("Closing connection to client");
+          gui.close();
+        } 
+        else {
           recieveMessage(receivedMessage);
         }
 
       } catch (IOException e) {
-        System.out.print("error");
         e.printStackTrace();
       }
 

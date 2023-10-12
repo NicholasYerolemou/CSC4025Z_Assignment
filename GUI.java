@@ -15,7 +15,7 @@ public class GUI {
     private JFrame frame;
     private JTextField filePathField;
     private JTextArea captionArea;
-    private JTextArea encodedImageArea;
+    // private JTextArea encodedImageArea;
     private JLabel imagePreviewLabel; // Added for image preview
     private byte[] imageBytes; // To store the image data as bytes
     private JButton sendButton; // Added for sending the image
@@ -67,19 +67,20 @@ public class GUI {
         frame.add(sendButton);
 
         // Text area to display the encoded image string
-        encodedImageArea = new JTextArea(10, 30);
-        encodedImageArea.setWrapStyleWord(true);
-        encodedImageArea.setLineWrap(true);
-        encodedImageArea.setEditable(false);
-        encodedImageArea.setBorder(BorderFactory.createTitledBorder("Encoded Image"));
-        JScrollPane encodedScrollPane = new JScrollPane(encodedImageArea);
+        // encodedImageArea = new JTextArea(10, 30);
+        // encodedImageArea.setWrapStyleWord(true);
+        // encodedImageArea.setLineWrap(true);
+        // encodedImageArea.setEditable(false);
+        // encodedImageArea.setBorder(BorderFactory.createTitledBorder("Encoded
+        // Image"));
+        // JScrollPane encodedScrollPane = new JScrollPane(encodedImageArea);
         // frame.add(encodedScrollPane);
 
         imagePreviewLabel = new JLabel();
         imagePreviewLabel.setBorder(BorderFactory.createTitledBorder("Image Preview"));
 
         frame.add(topPanel, BorderLayout.NORTH);
-        frame.add(encodedScrollPane, BorderLayout.CENTER);
+        // frame.add(encodedScrollPane, BorderLayout.CENTER);
         frame.add(imagePreviewLabel, BorderLayout.SOUTH);
 
         // Action listener for the "Select Image" button
@@ -132,7 +133,7 @@ public class GUI {
             String imageString = Base64.getEncoder().encodeToString(imageData.getBytes());
             client.sendMessage(captionArea.getText(), imageData);
 
-            encodedImageArea.setText(imageString);
+            // encodedImageArea.setText(imageString);
         } else {
             JOptionPane.showMessageDialog(frame, "Please select an image first!");
         }
@@ -161,7 +162,7 @@ public class GUI {
             captionArea.setText(message);
         if (image != null) {
             imageBytes = image.getBytes();
-            encodedImageArea.setText(image.encodeImage());
+            // encodedImageArea.setText(image.encodeImage());
             previewImage(image);
         }
     }

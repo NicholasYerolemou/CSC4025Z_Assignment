@@ -585,7 +585,7 @@ public class Client {
       String decryptedMessage = decryptMessage(message);
       List<String> messageLines = Arrays.asList(decryptedMessage.split("\n"));
       String receivedHash = messageLines.get(0).split(":")[1].trim();
-      String messageWithoutHash = String.join("\n", messageLines.subList(1, messageLines.size())) + "\n";
+      String messageWithoutHash = String.join("\n", messageLines.subList(1, messageLines.size())) + "\n"; // New line
 
       if (verifyHash(messageWithoutHash, receivedHash)) {
         Map<String, String> parsedMessage = parseMessage(messageLines);

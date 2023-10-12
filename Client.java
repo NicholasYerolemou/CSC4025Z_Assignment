@@ -83,6 +83,10 @@ public class Client {
     }
   }
 
+  public String getName() {
+    return username;
+  }
+
   private void generateKeys() {
     // generate this clients pub and private keys
     KeyPairGenerator keyPairGenerator;

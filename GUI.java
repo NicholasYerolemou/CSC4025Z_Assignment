@@ -220,6 +220,11 @@ public class GUI {
         });
     }
 
+    public void close() {
+        frame.setVisible(false);
+        frame.dispose();
+    }
+
     public void setData(String message, ImageData image) {
         imageData = image;
         updateChatDisplay(message, true, image);
@@ -277,4 +282,5 @@ class ChatBubble extends JPanel {
         this.setMaximumSize(this.getPreferredSize());
         this.setMinimumSize(this.getPreferredSize());
     }
+
 }

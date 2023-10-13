@@ -18,15 +18,12 @@ import org.bouncycastle.x509.X509V1CertificateGenerator;
 
 public class Certificate {
 
-    public static X509Certificate certificate;
-    private PublicKey CA_PublicKey;
-    private SecurityVault security;
-    private String username;
-  
+  public static X509Certificate certificate;
+  private PublicKey CA_PublicKey;
+  private SecurityVault security;
+  private String username;
 
-
-  public Certificate (SecurityVault sv,String username)
-  {
+  public Certificate(SecurityVault sv, String username) {
     security = sv;
     this.username = username;
     getCertificate();
@@ -36,7 +33,7 @@ public class Certificate {
     // connect to the CA and request a new certificate
     Socket CA_Socket = connectToCA();
     if (CA_Socket != null) {
-      System.out.println("Connected to CA.");
+      System.out.println(username + " has connected to CA.");
       // request new certificate
       // we may need to first establish a secure channel
 
@@ -79,7 +76,8 @@ public class Certificate {
         String certificateString = inputStream.readLine();
         System.out.println("Received certificate.");
 
-        try { //if the CSR failed they return "Invalid CSR", check for that and reattempt certificate 
+        try { // if the CSR failed they return "Invalid CSR", check for that and reattempt
+              // certificate
           // Convert the certificate from String to X509Certificate
           byte[] certificateBytes = Base64.getDecoder().decode(certificateString);
 
@@ -136,6 +134,5 @@ public class Certificate {
     return CA_Socket;
 
   }
-
 
 }

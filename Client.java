@@ -43,6 +43,7 @@ import org.bouncycastle.x509.X509V1CertificateGenerator;
 import javax.crypto.spec.IvParameterSpec;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 import java.util.List;
 import javax.crypto.Cipher;
 import java.nio.charset.StandardCharsets;
@@ -59,7 +60,6 @@ public class Client {
   private GUI gui;
   private SecurityVault security;
   private Session session;
-  private byte[] iv;
   private Certificate certificate;
   Thread userListenerThread;
 
@@ -93,12 +93,13 @@ public class Client {
     try {
       ServerSocket serverSocket = new ServerSocket(PORT);
       // the socket this client is listening for connections on
-      System.out.println("Listening on port " + PORT);
+      // System.out.println("Listening on port " + PORT);
 
       // Accept incoming client connections
       targetSocket = serverSocket.accept();
       // the socket of the client we are connected to
-      System.out.println("Client connected from " + targetSocket.getInetAddress().getHostAddress() + ".");
+      // System.out.println("Client connected from " +
+      // targetSocket.getInetAddress().getHostAddress() + ".");
       connected = true;
       session = new Session(this, targetSocket, security, certificate);
       listenForUserInput();
@@ -117,7 +118,7 @@ public class Client {
 
       targetSocket = new Socket(SERVER_ADDRESS, PORT);
       // the socket of the client we are connected to
-      System.out.println("Connected to client at " + SERVER_ADDRESS + ":" + PORT);
+      // System.out.println("Connected to client at " + SERVER_ADDRESS + ":" + PORT);
       connected = true;
       session = new Session(this, targetSocket, security, certificate);
       listenForUserInput();
@@ -133,7 +134,7 @@ public class Client {
     // Create another thread to listen for user input to trigger sending a message.
 
     userListenerThread = new Thread(() -> {
-      System.out.println("Listening for user input.");
+      // System.out.println("Listening for user input.");
       gui = new GUI(this);
 
     });
@@ -142,7 +143,7 @@ public class Client {
   }
 
   private void listenForMessages() {
-    System.out.println("Listening for incoming messages.");
+    // System.out.println("Listening for incoming messages.");
 
     // listen for a recieved input to trigger processing a message.
     // Create input and output streams
@@ -226,7 +227,7 @@ public class Client {
     try {
       PrintWriter outputStream = new PrintWriter(targetSocket.getOutputStream(), true);
       String messageToSend = messageGenerator(message, image);
-      String encryptedMessage = security.encryptMessage(messageToSend);
+      String encryptedMessage = security.encryptMessage(messageToSend, session.getIV());
       outputStream.println(encryptedMessage); // Send a message
     } catch (Exception e) {
       // TODO Auto-generated catch block
@@ -280,7 +281,7 @@ public class Client {
    */
   private void recieveMessage(String message) {
     try {
-      String decryptedMessage = security.decryptMessage(message);
+      String decryptedMessage = security.decryptMessage(message, session.getIV());
       List<String> messageLines = Arrays.asList(decryptedMessage.split("\n"));
       String receivedHash = messageLines.get(0).split("::>")[1].trim();
       String messageWithoutHash = String.join("\n", messageLines.subList(1, messageLines.size())) + "\n"; // New line
@@ -305,6 +306,25 @@ public class Client {
       e.printStackTrace();
       System.out.println("Unable to receive message. " + e.getMessage());
     }
+  }
+
+  // Shuffle the bytes within the certificate to make it invalid
+  private static byte[] alterCertificate(byte[] certificateBytes) {
+    // Create a random number generator
+    Random random = new Random();
+    int max = 256;
+    if (certificateBytes.length < max)
+      max = certificateBytes.length;
+
+    // Shuffle the bytes by swapping pairs of bytes randomly
+    for (int i = 0; i < max; i += 1) {
+      int j = random.nextInt(max);
+      byte temp = certificateBytes[i];
+      certificateBytes[i] = certificateBytes[j];
+      certificateBytes[j] = temp;
+    }
+
+    return certificateBytes;
   }
 
   public static void main(String[] args) {

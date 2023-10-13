@@ -15,19 +15,20 @@ import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
 
 public class SecurityVault {
-    
-    private KeyPair keyPair;
-    private SecretKey sessionKey;
-    private PublicKey otherClientPublicKey;
 
-    public SecurityVault()
-    {
-        
-        generateKeys();
-        
-    }
+  private KeyPair keyPair;
+  private SecretKey sessionKey;
+  private PublicKey otherClientPublicKey;
+  // private byte[] iv;
+
+  public SecurityVault() {
+    // this.iv = initV;
+    generateKeys();
+
+  }
 
   private void generateKeys() {
     // generate this clients pub and private keys
@@ -50,12 +51,12 @@ public class SecurityVault {
    * @param message The message protocol to be encrypted
    * @return The encrypted message protocol
    */
-  public String encryptMessage(String message) {
+  public String encryptMessage(String message, byte[] iv) {
     try {
       // Create a Cipher for Encryption
-      Cipher cipher = Cipher.getInstance("AES");
+      Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
       // use session key to encrypt it all
-      cipher.init(Cipher.ENCRYPT_MODE, sessionKey);
+      cipher.init(Cipher.ENCRYPT_MODE, sessionKey, new IvParameterSpec(iv));
       byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
       // Encrypt the Message
       byte[] encryptedMessage = cipher.doFinal(messageBytes);
@@ -73,11 +74,11 @@ public class SecurityVault {
    * @param message The message protocol to be decrypted
    * @return The decrypted message protocol
    */
-  public String decryptMessage(String message) {
+  public String decryptMessage(String message, byte[] iv) {
     try {
       // Create a Cipher for Decryption
-      Cipher cipher = Cipher.getInstance("AES");
-      cipher.init(Cipher.DECRYPT_MODE, sessionKey);
+      Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+      cipher.init(Cipher.DECRYPT_MODE, sessionKey, new IvParameterSpec(iv));
 
       // Assuming you have the encrypted message as a byte array
       byte[] encryptedMessage = Base64.getDecoder().decode(message.getBytes(StandardCharsets.UTF_8)); //
@@ -95,7 +96,7 @@ public class SecurityVault {
     }
   }
 
-  public  byte[] encryptRSA(byte[] messageBytes) {
+  public byte[] encryptRSA(byte[] messageBytes) {
 
     try {
 
@@ -116,34 +117,34 @@ public class SecurityVault {
     }
   }
 
-  public  byte[] decryptRSA(byte[] messageBytes) {
-    
+  public byte[] decryptRSA(byte[] messageBytes) {
+
     try {
 
-        byte[] decryptedBytes = messageBytes;
-        Cipher cipher;
-  
-        // decrypt with their public key
-        // cipher.init(Cipher.DECRYPT_MODE, otherClientPublicKey);
-        // decryptedBytes = cipher.doFinal(decryptedBytes);
-  
-        // decrypt our private key
-        cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-        cipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate());
-        decryptedBytes = cipher.doFinal(decryptedBytes);
-  
-        return decryptedBytes;
-      } catch (NoSuchAlgorithmException | NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException
-          | InvalidKeyException e) {
-  
-        e.printStackTrace();
-        System.out.println("Error thrown in decrypt RSA");
-        return null;
-      }
-  
+      byte[] decryptedBytes = messageBytes;
+      Cipher cipher;
+
+      // decrypt with their public key
+      // cipher.init(Cipher.DECRYPT_MODE, otherClientPublicKey);
+      // decryptedBytes = cipher.doFinal(decryptedBytes);
+
+      // decrypt our private key
+      cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+      cipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate());
+      decryptedBytes = cipher.doFinal(decryptedBytes);
+
+      return decryptedBytes;
+    } catch (NoSuchAlgorithmException | NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException
+        | InvalidKeyException e) {
+
+      e.printStackTrace();
+      System.out.println("Error thrown in decrypt RSA");
+      return null;
     }
 
-      /**
+  }
+
+  /**
    * This method is used to calculate the hash of a message using SHA-256.
    *
    * @param message The message to be hashed
@@ -167,6 +168,33 @@ public class SecurityVault {
       // TODO: handle exception
       e.printStackTrace();
       return "";
+    }
+  }
+
+  /**
+   * This method is used to calculate the hash of a message using SHA-256.
+   *
+   * @param message The message to be hashed
+   * @return The hash of the message
+   */
+  public byte[] calculateHash(byte[] message) {
+    try {
+      // Get the private key for signing
+      PrivateKey privateKey = keyPair.getPrivate();
+      MessageDigest md = MessageDigest.getInstance("SHA-256");
+      byte[] hashBytes = md.digest(message);
+      // Initialize a Signature object with the private key
+      Signature signature = Signature.getInstance("SHA256withRSA");
+      signature.initSign(privateKey);
+      // Update the signature with the hash of the data
+      signature.update(hashBytes);
+      // Sign the data
+      byte[] digitalSignature = signature.sign();
+      return digitalSignature;
+    } catch (Exception e) {
+      // TODO: handle exception
+      e.printStackTrace();
+      return null;
     }
   }
 
@@ -195,17 +223,40 @@ public class SecurityVault {
     }
   }
 
-  public KeyPair getKeyPair()
-  {
+  /**
+   * This method is used to verify the hash of a message.
+   *
+   * @param message      The message to be checked
+   * @param recievedHash The hash to be compared against
+   * @return True if the hashes match, false otherwise
+   */
+  public boolean verifyHash(byte[] message, byte[] ditigalSignature) {
+    try {
+      // Create a hash of the data using SHA-256
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      byte[] hash = digest.digest(message);
+      // byte[] ditigalSignature = Base64.getDecoder().decode(recievedHash);
+      Signature signature = Signature.getInstance("SHA256withRSA");
+      // To verify the signature using the public key
+      signature.initVerify(otherClientPublicKey);
+      signature.update(hash);
+      return signature.verify(ditigalSignature);
+    } catch (Exception e) {
+      // TODO: handle exception
+      e.printStackTrace();
+      return false;
+    }
+  }
+
+  public KeyPair getKeyPair() {
     return keyPair;
   }
 
- public void updateSessionKey(SecretKey sk)
- {
-  sessionKey = sk;
- }
+  public void updateSessionKey(SecretKey sk) {
+    sessionKey = sk;
+  }
 
-public void updateTargetPublicKey(PublicKey otherClientPublicKey) {
-  this.otherClientPublicKey = otherClientPublicKey;
-} 
+  public void updateTargetPublicKey(PublicKey otherClientPublicKey) {
+    this.otherClientPublicKey = otherClientPublicKey;
+  }
 }

@@ -60,6 +60,7 @@ public class Client {
   private GUI gui;
   private PublicKey CA_PublicKey;
   private PublicKey otherClientPublicKey;
+  private byte[] iv;
   X509Certificate certificate;
 
   private KeyPair keyPair;
@@ -274,19 +275,32 @@ public class Client {
 
         byte[] encryptedMessage = sessionKey.getEncoded();
         encryptedMessage = encryptRSA(encryptedMessage);
+        // Generate a random IV
+        SecureRandom secureRandom = new SecureRandom();
+        byte[] generatedIV = new byte[16]; // 16 bytes for AES
+        secureRandom.nextBytes(generatedIV);
+        iv = generatedIV;
+        byte[] encryptedIV = encryptRSA(iv);
 
         String encodedMessage = Base64.getEncoder().encodeToString(encryptedMessage);
+        String encodedIV = Base64.getEncoder().encodeToString(encryptedIV);
         outputStream.println(encodedMessage); // send message
+        outputStream.println(encodedIV);
 
       } else if (username.equalsIgnoreCase("Bob")) {
         exchangeCertificates(outputStream, inputStream);
 
         // get session key from other client
         String message = inputStream.readLine();
+        String ivMessage = inputStream.readLine();
         byte[] decodedMessage = Base64.getDecoder().decode(message);
+        byte[] decodedIV = Base64.getDecoder().decode(ivMessage);
 
         decodedMessage = decryptRSA(decodedMessage);
+        decodedIV = decryptRSA(decodedIV);
+
         sessionKey = new SecretKeySpec(decodedMessage, "AES");
+        iv = decodedIV;
       }
 
       System.out.println("Session created.");
@@ -438,10 +452,10 @@ public class Client {
    * other client.
    *
    * Message structure below(newline delimiter):
-   * Message-Hash: <hash of message>
-   * Message: <message>
-   * Image: <image>
-   * Image-Dimensions: <dimensions>
+   * Message-Hash::> <hash of message>
+   * Message::> <message>
+   * Image::> <image>
+   * Image-Dimensions::> <dimensions>
    * 
    * @param message The message to be sent
    * @param image   The image to be sent
@@ -450,17 +464,17 @@ public class Client {
   private String messageGenerator(String message, ImageData image) {
     try {
       StringBuilder messageProtocol = new StringBuilder();
-      messageProtocol.append("Message: ").append(message).append("\n");
+      messageProtocol.append("Message::> ").append(message).append("\n");
       if (image != null) {
-        messageProtocol.append("Image: ").append(image.encodeImage()).append("\n");
-        messageProtocol.append("Image-Dimensions: ").append(image.getWidth()).append(",").append(image.getHeight())
+        messageProtocol.append("Image::> ").append(image.encodeImage()).append("\n");
+        messageProtocol.append("Image-Dimensions::> ").append(image.getWidth()).append(",").append(image.getHeight())
             .append("\n");
       }
 
       String temp = messageProtocol.toString();
       // hash message
       String messageHash = calculateHash(temp);
-      String messageHashLine = "Message-Hash: " + messageHash + "\n";
+      String messageHashLine = "Message-Hash::> " + messageHash + "\n";
       // create combination of message and hash
       messageProtocol.insert(0, messageHashLine);
       return messageProtocol.toString();
@@ -480,9 +494,9 @@ public class Client {
   private String encryptMessage(String message) {
     try {
       // Create a Cipher for Encryption
-      Cipher cipher = Cipher.getInstance("AES");
+      Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
       // use session key to encrypt it all
-      cipher.init(Cipher.ENCRYPT_MODE, sessionKey);
+      cipher.init(Cipher.ENCRYPT_MODE, sessionKey, new IvParameterSpec(iv));
       byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
       // Encrypt the Message
       byte[] encryptedMessage = cipher.doFinal(messageBytes);
@@ -490,6 +504,7 @@ public class Client {
     } catch (Exception e) {
       // TODO: handle exception
       e.printStackTrace();
+      System.out.println("Failed to encrypt.");
       return "";
     }
   }
@@ -503,8 +518,8 @@ public class Client {
   private String decryptMessage(String message) {
     try {
       // Create a Cipher for Decryption
-      Cipher cipher = Cipher.getInstance("AES");
-      cipher.init(Cipher.DECRYPT_MODE, sessionKey);
+      Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+      cipher.init(Cipher.DECRYPT_MODE, sessionKey, new IvParameterSpec(iv));
 
       // Assuming you have the encrypted message as a byte array
       byte[] encryptedMessage = Base64.getDecoder().decode(message.getBytes(StandardCharsets.UTF_8)); //
@@ -563,7 +578,7 @@ public class Client {
     Map<String, String> result = new HashMap<String, String>();
 
     for (String line : messageLines) {
-      String[] lineSplit = line.split(":");
+      String[] lineSplit = line.split("::>");
       String keyName = lineSplit[0].toLowerCase();
 
       if (keyName.equals("message-hash"))
@@ -588,7 +603,7 @@ public class Client {
     try {
       String decryptedMessage = decryptMessage(message);
       List<String> messageLines = Arrays.asList(decryptedMessage.split("\n"));
-      String receivedHash = messageLines.get(0).split(":")[1].trim();
+      String receivedHash = messageLines.get(0).split("::>")[1].trim();
       String messageWithoutHash = String.join("\n", messageLines.subList(1, messageLines.size())) + "\n"; // New line
 
       if (verifyHash(messageWithoutHash, receivedHash)) {
@@ -598,6 +613,7 @@ public class Client {
           int imageHeight = Integer.parseInt(parsedMessage.get("image-dimensions").split(",")[1].trim());
           String encodedImage = parsedMessage.get("image");
           ImageData image = new ImageData(imageHeight, imageWidth, encodedImage);
+
           gui.setData(parsedMessage.get("message"), image);
         } else if (parsedMessage.containsKey("message")) {
           gui.setData(parsedMessage.get("message"), null);

@@ -61,4 +61,8 @@ public class ImageData {
         }
         return new ImageIcon(scaledImage);
     }
+
+    public String toString() {
+        return "Length of bytes: " + imageBytes.length;
+    }
 }

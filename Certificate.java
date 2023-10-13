@@ -22,6 +22,7 @@ public class Certificate {
     private PublicKey CA_PublicKey;
     private SecurityVault security;
     private String username;
+  
 
 
   public Certificate (SecurityVault sv,String username)

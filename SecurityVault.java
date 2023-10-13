@@ -200,8 +200,6 @@ public class SecurityVault {
     return keyPair;
   }
 
-
-
  public void updateSessionKey(SecretKey sk)
  {
   sessionKey = sk;

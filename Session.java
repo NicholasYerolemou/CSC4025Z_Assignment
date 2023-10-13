@@ -63,11 +63,24 @@ public class Session {
         keyGenerator.init(128);
         sessionKey = keyGenerator.generateKey();
         security.updateSessionKey(sessionKey);
+        
 
-        byte[] encryptedMessage = sessionKey.getEncoded();
-        encryptedMessage = security.encryptRSA(encryptedMessage);
 
-        String encodedMessage = Base64.getEncoder().encodeToString(encryptedMessage);
+        byte[] sessionKeyBytes = sessionKey.getEncoded();
+        String sessionKeyString = new String(sessionKeyBytes);
+        String sessionKeyHash = security.calculateHash(sessionKeyString); //calculate hash
+
+        //encrypt the session key
+        byte[] encryptedSessionKey = security.encryptRSA(sessionKeyBytes);
+        // String encryptedSessionKeyString = new String(encryptedSessionKey);
+
+       
+        //encode message
+        String encodedSessionKeyHash = Base64.getEncoder().encodeToString(sessionKeyHash.getBytes());
+        String encodedEncryptedSessionKey = Base64.getEncoder().encodeToString(encryptedSessionKey);
+        String encodedMessage = encodedSessionKeyHash+"/r/n"+encodedEncryptedSessionKey;
+
+    
         outputStream.println(encodedMessage); // send message
 
       } else if (client.username.equalsIgnoreCase("Bob")) {
@@ -75,11 +88,28 @@ public class Session {
 
         // get session key from other client
         String message = inputStream.readLine();
-        byte[] decodedMessage = Base64.getDecoder().decode(message);
+        String [] data = message.split("/r/n");
+        String encodedSessionKeyHash = data[0];
+        String encodedEncryptedSessionKey = data[1];
+        byte[] sessionKeyHash = Base64.getDecoder().decode(encodedSessionKeyHash.getBytes());
+        String sessionKeyHashString = new String(sessionKeyHash);
+        byte[] encryptedSessionKey = Base64.getDecoder().decode(encodedEncryptedSessionKey.getBytes());
+        // System.out.println("length of encrypted session key "+encryptedSessionKey.length);
+        byte[] sessionKeyBytes = security.decryptRSA(encryptedSessionKey);
+        String sessionKeyString = new String (sessionKeyBytes);
 
-        decodedMessage = security.decryptRSA(decodedMessage);
-        sessionKey = new SecretKeySpec(decodedMessage, "AES");
-        security.updateSessionKey(sessionKey);
+        if(security.verifyHash(sessionKeyString,sessionKeyHashString))
+        {
+          sessionKey = new SecretKeySpec(sessionKeyBytes, "AES");
+          security.updateSessionKey(sessionKey);
+        }
+        else
+        {
+            System.out.println("Error, session key does not match its hash.");
+        }
+
+
+        
       }
 
       System.out.println("Session created.");
